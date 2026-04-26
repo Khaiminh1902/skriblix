@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+html,
+body {
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -20,7 +26,111 @@
 }
 
 body {
+  margin: 0;
+  min-height: 100dvh;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+body {
+  background-color: #f8f6ef;
+  background-image:
+    radial-gradient(circle at 20px 20px, rgba(0, 0, 0, 0.04) 1px, transparent 0),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 237, 228, 0.92));
+  background-size: 28px 28px, 100% 100%;
+  background-repeat: repeat, no-repeat;
+}
+
+.doodle-shell {
+  position: relative;
+  min-height: 100dvh;
+}
+
+.doodle-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 26px,
+      rgba(0, 0, 0, 0.035) 27px
+    );
+  opacity: 0.75;
+}
+
+.doodle-card {
+  position: relative;
+  border: 2px solid #111111;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 5px 5px 0 #111111;
+}
+
+.doodle-card::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed rgba(17, 17, 17, 0.25);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.doodle-pill {
+  border: 2px solid #111111;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 3px 3px 0 #111111;
+}
+
+.doodle-button {
+  border: 2px solid #111111;
+  border-radius: 14px;
+  background: #111111;
+  color: #ffffff;
+  box-shadow: 4px 4px 0 #111111;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.doodle-button:hover:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #111111;
+}
+
+.doodle-button:disabled {
+  cursor: not-allowed;
+  background: #d4d4d4;
+  color: #737373;
+  box-shadow: none;
+}
+
+.doodle-button-secondary {
+  background: #ffffff;
+  color: #111111;
+}
+
+.doodle-input {
+  border: 2px solid #111111;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #111111;
+  box-shadow: inset 0 -2px 0 rgba(17, 17, 17, 0.08);
+}
+
+.doodle-input::placeholder {
+  color: #737373;
+}
+
+.doodle-input:focus {
+  outline: none;
+  box-shadow:
+    inset 0 -2px 0 rgba(17, 17, 17, 0.08),
+    0 0 0 3px rgba(17, 17, 17, 0.12);
 }
