@@ -132,6 +132,7 @@ export function setupSocket(httpServer: any) {
             messages: [],
             gameState: "waiting",
             createdAt: Date.now(),
+            hostId: socket.id,
           };
 
           rooms.set(roomId, room);
@@ -191,6 +192,11 @@ export function setupSocket(httpServer: any) {
         const room = rooms.get(roomId);
 
         if (!room) return;
+        // Only the host can start the game
+        if (room.hostId !== socket.id) {
+          socket.emit("error", { message: "Only the host can start the game" });
+          return;
+        }
         if (room.players.length < 2) {
           socket.emit("error", { message: "Need at least 2 players to start" });
           return;

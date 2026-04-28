@@ -4,9 +4,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DoodleLoadingScreen } from "./components/doodle-loading-screen";
+
+const TRANSITION_LOADING_MS = 1500;
+const PLAYER_KEY_STORAGE_KEY = "skriblix-player-key";
 
 function generateRoomId() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function getPlayerKey() {
+  const existingKey = window.localStorage.getItem(PLAYER_KEY_STORAGE_KEY);
+  if (existingKey) return existingKey;
+
+  const nextKey =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `player-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(PLAYER_KEY_STORAGE_KEY, nextKey);
+  return nextKey;
 }
 
 export default function HomeClient({
@@ -20,8 +36,13 @@ export default function HomeClient({
   const [joinRoomId, setJoinRoomId] = useState("");
   const [draftRoomId, setDraftRoomId] = useState(initialRoomId);
   const [copyLabel, setCopyLabel] = useState("Copy room ID");
+  const [pendingAction, setPendingAction] = useState<
+    "create" | "join" | null
+  >(null);
   const createPlayerNameRef = useRef("");
   const copyResetRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingNavigationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingActionStartedAtRef = useRef<number>(0);
   const socketRef = useRef<any>(null);
 
   useEffect(() => {
@@ -33,6 +54,9 @@ export default function HomeClient({
       if (copyResetRef.current) {
         clearTimeout(copyResetRef.current);
       }
+      if (pendingNavigationTimerRef.current) {
+        clearTimeout(pendingNavigationTimerRef.current);
+      }
     };
   }, []);
 
@@ -42,12 +66,22 @@ export default function HomeClient({
     socketRef.current = s;
 
     s.on("room_created", (data: any) => {
-      router.push(
-        `/room/${data.room.id}?playerName=${encodeURIComponent(createPlayerNameRef.current)}`,
-      );
+      const elapsed = Date.now() - pendingActionStartedAtRef.current;
+      const remainingDelay = Math.max(0, TRANSITION_LOADING_MS - elapsed);
+
+      pendingNavigationTimerRef.current = setTimeout(() => {
+        router.push(
+          `/room/${data.room.id}?playerName=${encodeURIComponent(createPlayerNameRef.current)}`,
+        );
+      }, remainingDelay);
     });
 
     s.on("error", (data: any) => {
+      if (pendingNavigationTimerRef.current) {
+        clearTimeout(pendingNavigationTimerRef.current);
+        pendingNavigationTimerRef.current = null;
+      }
+      setPendingAction(null);
       alert(data.message || "Something went wrong");
     });
 
@@ -68,8 +102,11 @@ export default function HomeClient({
       alert("Please choose a room ID");
       return;
     }
+    pendingActionStartedAtRef.current = Date.now();
+    setPendingAction("create");
     socketRef.current?.emit("create_room", {
       playerName: createPlayerName.trim(),
+      playerKey: getPlayerKey(),
       theme: "doodle",
       roomId: draftRoomId.trim(),
     });
@@ -85,9 +122,13 @@ export default function HomeClient({
       alert("Please enter a 6-digit room ID");
       return;
     }
-    router.push(
-      `/room/${normalizedRoomId}?playerName=${encodeURIComponent(joinPlayerName.trim())}`,
-    );
+    pendingActionStartedAtRef.current = Date.now();
+    setPendingAction("join");
+    pendingNavigationTimerRef.current = setTimeout(() => {
+      router.push(
+        `/room/${normalizedRoomId}?playerName=${encodeURIComponent(joinPlayerName.trim())}`,
+      );
+    }, TRANSITION_LOADING_MS);
   };
 
   const rerollRoomId = () => {
@@ -110,6 +151,25 @@ export default function HomeClient({
       setCopyLabel("Copy failed");
     }
   };
+
+  if (pendingAction) {
+    return (
+      <DoodleLoadingScreen
+        badge={pendingAction === "create" ? "Creating Room" : "Joining Room"}
+        title={
+          pendingAction === "create"
+            ? "Sketchbook opening"
+            : "Finding your table"
+        }
+        subtitle={
+          pendingAction === "create"
+            ? "Setting up a fresh room and pinning the room code to the corkboard."
+            : "Checking the room code and pulling your seat into the waiting room."
+        }
+        roomId={pendingAction === "create" ? draftRoomId : joinRoomId}
+      />
+    );
+  }
 
   return (
     <div className="doodle-shell text-zinc-950">

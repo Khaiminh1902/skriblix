@@ -13,7 +13,10 @@ const handle = app.getRequestHandler();
 function registerSocketHandlers(io) {
   const rooms = new Map();
   const roomCleanupTimers = new Map();
+  const gamePhaseTimers = new Map();
   const EMPTY_ROOM_TTL_MS = 60 * 1000;
+  const PRE_GAME_COUNTDOWN_MS = 5 * 1000;
+  const PRE_GAME_LOADING_MS = 1500;
 
   function clearRoomCleanup(roomId) {
     const timer = roomCleanupTimers.get(roomId);
@@ -25,6 +28,7 @@ function registerSocketHandlers(io) {
 
   function scheduleRoomCleanup(roomId) {
     clearRoomCleanup(roomId);
+    clearGameTimers(roomId);
     const timer = setTimeout(() => {
       const room = rooms.get(roomId);
       if (room && room.players.length === 0) {
@@ -34,6 +38,21 @@ function registerSocketHandlers(io) {
       roomCleanupTimers.delete(roomId);
     }, EMPTY_ROOM_TTL_MS);
     roomCleanupTimers.set(roomId, timer);
+  }
+
+  function clearGameTimers(roomId) {
+    const timers = gamePhaseTimers.get(roomId);
+    if (!timers) return;
+
+    if (timers.countdownTimer) {
+      clearTimeout(timers.countdownTimer);
+    }
+
+    if (timers.loadingTimer) {
+      clearTimeout(timers.loadingTimer);
+    }
+
+    gamePhaseTimers.delete(roomId);
   }
 
   function getRoomList() {
@@ -101,6 +120,56 @@ function registerSocketHandlers(io) {
     return roomId;
   }
 
+  function emitRoomState(roomId) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    io.to(roomId).emit("room_update", { room });
+    io.to("lobby").emit("room_list", getRoomList());
+  }
+
+  function startDrawingRound(roomId) {
+    const room = rooms.get(roomId);
+    if (!room || room.players.length === 0) return;
+
+    const hasCurrentDrawer = room.players.some((player) => player.id === room.drawer);
+    if (!hasCurrentDrawer) {
+      room.drawer = room.players[0].id;
+    }
+
+    room.currentWord = getRandomWord();
+    room.drawings = [];
+    room.gameState = "drawing";
+    room.countdownEndsAt = null;
+    room.loadingEndsAt = null;
+
+    clearGameTimers(roomId);
+    io.to(roomId).emit("game_started", { room });
+    io.to(roomId).emit("new_round", {
+      drawerId: room.drawer,
+      word: room.currentWord,
+    });
+    emitRoomState(roomId);
+  }
+
+  function cancelPreGameIfNeeded(roomId) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    if (
+      room.players.length < 2 &&
+      (room.gameState === "countdown" || room.gameState === "starting")
+    ) {
+      clearGameTimers(roomId);
+      room.gameState = "waiting";
+      room.drawer = null;
+      room.currentWord = null;
+      room.countdownEndsAt = null;
+      room.loadingEndsAt = null;
+      emitRoomState(roomId);
+    }
+  }
+
   io.on("connection", (socket) => {
     console.log("Player connected:", socket.id);
 
@@ -110,43 +179,71 @@ function registerSocketHandlers(io) {
       socket.emit("room_list", getRoomList());
     });
 
-    socket.on("create_room", ({ playerName, theme = "doodle", roomId: requestedRoomId }) => {
-      const roomId = requestedRoomId || generateRoomId();
+    socket.on(
+      "create_room",
+      ({
+        playerName,
+        playerKey,
+        theme = "doodle",
+        roomId: requestedRoomId,
+      }) => {
+        const roomId = requestedRoomId || generateRoomId();
 
-      if (!/^\d{6}$/.test(roomId)) {
-        socket.emit("error", { message: "Room ID must be a 6-digit number" });
-        return;
-      }
+        if (!/^\d{6}$/.test(roomId)) {
+          socket.emit("error", { message: "Room ID must be a 6-digit number" });
+          return;
+        }
 
-      if (rooms.has(roomId)) {
-        socket.emit("error", { message: "Room ID already in use" });
-        return;
-      }
+        if (!playerKey) {
+          socket.emit("error", { message: "Missing player identity" });
+          return;
+        }
 
-      const room = {
-        id: roomId,
-        theme,
-        players: [{ id: socket.id, name: playerName, status: "connected" }],
-        drawer: null,
-        currentWord: null,
-        drawings: [],
-        messages: [],
-        gameState: "waiting",
-        createdAt: Date.now(),
-      };
+        if (rooms.has(roomId)) {
+          socket.emit("error", { message: "Room ID already in use" });
+          return;
+        }
 
-      rooms.set(roomId, room);
-      clearRoomCleanup(roomId);
-      socket.join(roomId);
-      socket.emit("room_created", { room, playerId: socket.id });
-      io.to("lobby").emit("room_list", getRoomList());
-    });
+        const room = {
+          id: roomId,
+          theme,
+          hostId: socket.id,
+          players: [
+            {
+              id: socket.id,
+              playerKey,
+              name: playerName,
+              status: "connected",
+            },
+          ],
+          drawer: null,
+          currentWord: null,
+          drawings: [],
+          messages: [],
+          gameState: "waiting",
+          countdownEndsAt: null,
+          loadingEndsAt: null,
+          createdAt: Date.now(),
+        };
 
-    socket.on("join_room", ({ roomId, playerName }) => {
+        rooms.set(roomId, room);
+        clearRoomCleanup(roomId);
+        socket.join(roomId);
+        socket.emit("room_created", { room, playerId: socket.id });
+        io.to("lobby").emit("room_list", getRoomList());
+      },
+    );
+
+    socket.on("join_room", ({ roomId, playerName, playerKey }) => {
       const room = rooms.get(roomId);
 
       if (!room) {
         socket.emit("error", { message: "Room not found" });
+        return;
+      }
+
+      if (!playerKey) {
+        socket.emit("error", { message: "Missing player identity" });
         return;
       }
 
@@ -157,17 +254,31 @@ function registerSocketHandlers(io) {
         return;
       }
 
-      const existingPlayer = room.players.find((player) => player.id === socket.id);
-      if (!existingPlayer) {
-        const player = { id: socket.id, name: playerName, status: "connected" };
+      const existingPlayer = room.players.find(
+        (player) => player.playerKey === playerKey,
+      );
+      if (existingPlayer) {
+        const previousPlayerId = existingPlayer.id;
+        existingPlayer.id = socket.id;
+        existingPlayer.name = playerName;
+        existingPlayer.status = "connected";
+        if (room.hostId === previousPlayerId) {
+          room.hostId = socket.id;
+        }
+      } else {
+        const player = {
+          id: socket.id,
+          playerKey,
+          name: playerName,
+          status: "connected",
+        };
         room.players.push(player);
         io.to(roomId).emit("player_joined", { player });
       }
 
       socket.join(roomId);
       socket.emit("room_joined", { room, playerId: socket.id });
-      io.to(roomId).emit("room_update", { room });
-      io.to("lobby").emit("room_list", getRoomList());
+      emitRoomState(roomId);
     });
 
     socket.on("leave_room", ({ roomId }) => {
@@ -181,8 +292,12 @@ function registerSocketHandlers(io) {
       if (room.players.length === 0) {
         scheduleRoomCleanup(roomId);
       } else {
+        if (room.hostId === socket.id) {
+          room.hostId = room.players[0].id;
+        }
         io.to(roomId).emit("player_left", { playerId: socket.id });
-        io.to(roomId).emit("room_update", { room });
+        cancelPreGameIfNeeded(roomId);
+        emitRoomState(roomId);
       }
 
       io.to("lobby").emit("room_list", getRoomList());
@@ -192,20 +307,53 @@ function registerSocketHandlers(io) {
       const room = rooms.get(roomId);
 
       if (!room) return;
+      if (room.hostId !== socket.id) {
+        socket.emit("error", { message: "Only the host can start the game" });
+        return;
+      }
       if (room.players.length < 2) {
         socket.emit("error", { message: "Need at least 2 players to start" });
         return;
       }
 
-      room.gameState = "drawing";
-      room.drawer = room.players[0].id;
-      room.currentWord = getRandomWord();
+      clearGameTimers(roomId);
+      room.gameState = "countdown";
+      room.drawer = null;
+      room.currentWord = null;
+      room.drawings = [];
+      room.countdownEndsAt = Date.now() + PRE_GAME_COUNTDOWN_MS;
+      room.loadingEndsAt = null;
+      emitRoomState(roomId);
 
-      io.to(roomId).emit("game_started", { room });
-      io.to(roomId).emit("new_round", {
-        drawerId: room.drawer,
-        word: room.theme === "doodle" ? "???" : room.currentWord,
-      });
+      const countdownTimer = setTimeout(() => {
+        const activeRoom = rooms.get(roomId);
+        if (!activeRoom) return;
+        if (activeRoom.players.length < 2) {
+          cancelPreGameIfNeeded(roomId);
+          return;
+        }
+
+        activeRoom.gameState = "starting";
+        activeRoom.countdownEndsAt = null;
+        activeRoom.loadingEndsAt = Date.now() + PRE_GAME_LOADING_MS;
+        emitRoomState(roomId);
+
+        const loadingTimer = setTimeout(() => {
+          const loadingRoom = rooms.get(roomId);
+          if (!loadingRoom) return;
+          if (loadingRoom.players.length < 2) {
+            cancelPreGameIfNeeded(roomId);
+            return;
+          }
+
+          loadingRoom.drawer = loadingRoom.players[0].id;
+          startDrawingRound(roomId);
+        }, PRE_GAME_LOADING_MS);
+
+        gamePhaseTimers.set(roomId, { loadingTimer });
+      }, PRE_GAME_COUNTDOWN_MS);
+
+      gamePhaseTimers.set(roomId, { countdownTimer });
     });
 
     socket.on("drawing", ({ roomId, drawing }) => {
@@ -263,15 +411,7 @@ function registerSocketHandlers(io) {
       const nextDrawerIndex = (currentDrawerIndex + 1) % room.players.length;
 
       room.drawer = room.players[nextDrawerIndex].id;
-      room.currentWord = getRandomWord();
-      room.gameState = "drawing";
-      room.drawings = [];
-
-      io.to(roomId).emit("new_round", {
-        drawerId: room.drawer,
-        word: room.theme === "doodle" ? "???" : room.currentWord,
-      });
-      io.to(roomId).emit("game_state_update", { room });
+      startDrawingRound(roomId);
     });
 
     socket.on("disconnect", () => {
@@ -287,8 +427,12 @@ function registerSocketHandlers(io) {
         if (room.players.length === 0) {
           scheduleRoomCleanup(roomId);
         } else {
+          if (room.hostId === socket.id) {
+            room.hostId = room.players[0].id;
+          }
           io.to(roomId).emit("player_left", { playerId: socket.id });
-          io.to(roomId).emit("room_update", { room });
+          cancelPreGameIfNeeded(roomId);
+          emitRoomState(roomId);
         }
 
         io.to("lobby").emit("room_list", getRoomList());
