@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Skriblix - Draw & Guess",
-  description: "A fun drawing and guessing game like Skribble",
+  title: "Skriblix",
+  description: "A fun drawing and guessing game",
 };
 
 export default function RootLayout({

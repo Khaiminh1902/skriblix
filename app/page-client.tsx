@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DoodleLoadingScreen } from "./components/doodle-loading-screen";
+import { DoodleErrorPopup } from "./components/doodle-error-popup";
 
 const TRANSITION_LOADING_MS = 1500;
 const PLAYER_KEY_STORAGE_KEY = "skriblix-player-key";
@@ -31,14 +32,23 @@ export default function HomeClient({
   initialRoomId: string;
 }) {
   const router = useRouter();
-  const [createPlayerName, setCreatePlayerName] = useState("");
-  const [joinPlayerName, setJoinPlayerName] = useState("");
+  const [createPlayerName, setCreatePlayerName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const saved = localStorage.getItem("skriblix-create-name");
+    return saved || "";
+  });
+  const [joinPlayerName, setJoinPlayerName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const saved = localStorage.getItem("skriblix-join-name");
+    return saved || "";
+  });
   const [joinRoomId, setJoinRoomId] = useState("");
   const [draftRoomId, setDraftRoomId] = useState(initialRoomId);
   const [copyLabel, setCopyLabel] = useState("Copy room ID");
-  const [pendingAction, setPendingAction] = useState<
-    "create" | "join" | null
-  >(null);
+  const [pendingAction, setPendingAction] = useState<"create" | "join" | null>(
+    null,
+  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const createPlayerNameRef = useRef("");
   const copyResetRef = useRef<NodeJS.Timeout | null>(null);
   const pendingNavigationTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -50,29 +60,15 @@ export default function HomeClient({
   }, [createPlayerName]);
 
   useEffect(() => {
-    return () => {
-      if (copyResetRef.current) {
-        clearTimeout(copyResetRef.current);
-      }
-      if (pendingNavigationTimerRef.current) {
-        clearTimeout(pendingNavigationTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     const socketIo = require("socket.io-client");
     const s = socketIo();
     socketRef.current = s;
 
-    s.on("room_created", (data: any) => {
+     s.on("room_created", (data: any) => {
       const elapsed = Date.now() - pendingActionStartedAtRef.current;
       const remainingDelay = Math.max(0, TRANSITION_LOADING_MS - elapsed);
-
       pendingNavigationTimerRef.current = setTimeout(() => {
-        router.push(
-          `/room/${data.room.id}?playerName=${encodeURIComponent(createPlayerNameRef.current)}`,
-        );
+        router.push(`/room/${data.room.id}`);
       }, remainingDelay);
     });
 
@@ -82,30 +78,36 @@ export default function HomeClient({
         pendingNavigationTimerRef.current = null;
       }
       setPendingAction(null);
-      alert(data.message || "Something went wrong");
+      setErrorMessage(data.message || "Something went wrong");
     });
 
     return () => {
+      if (pendingNavigationTimerRef.current) {
+        clearTimeout(pendingNavigationTimerRef.current);
+        pendingNavigationTimerRef.current = null;
+      }
+      s.off("room_joined");
       s.off("room_created");
       s.off("error");
       s.disconnect();
       socketRef.current = null;
     };
-  }, [router]);
+  }, [router, pendingActionStartedAtRef]);
 
   const createRoom = () => {
-    if (!createPlayerName.trim()) {
-      alert("Please enter your name");
+    const name = createPlayerName.trim();
+    if (!name) {
+      setErrorMessage("Please enter your name");
       return;
     }
     if (!draftRoomId.trim()) {
-      alert("Please choose a room ID");
+      setErrorMessage("Please choose a room ID");
       return;
     }
     pendingActionStartedAtRef.current = Date.now();
     setPendingAction("create");
     socketRef.current?.emit("create_room", {
-      playerName: createPlayerName.trim(),
+      playerName: name,
       playerKey: getPlayerKey(),
       theme: "doodle",
       roomId: draftRoomId.trim(),
@@ -113,21 +115,20 @@ export default function HomeClient({
   };
 
   const joinRoom = () => {
-    if (!joinPlayerName.trim()) {
-      alert("Please enter your name");
+    const name = joinPlayerName.trim();
+    if (!name) {
+      setErrorMessage("Please enter your name");
       return;
     }
     const normalizedRoomId = joinRoomId.replace(/\D/g, "").slice(0, 6);
     if (normalizedRoomId.length !== 6) {
-      alert("Please enter a 6-digit room ID");
+      setErrorMessage("Please enter a 6-digit room ID");
       return;
     }
     pendingActionStartedAtRef.current = Date.now();
     setPendingAction("join");
     pendingNavigationTimerRef.current = setTimeout(() => {
-      router.push(
-        `/room/${normalizedRoomId}?playerName=${encodeURIComponent(joinPlayerName.trim())}`,
-      );
+      router.push(`/room/${normalizedRoomId}`);
     }, TRANSITION_LOADING_MS);
   };
 
@@ -137,7 +138,6 @@ export default function HomeClient({
   };
 
   const copyRoomId = async () => {
-    if (!draftRoomId) return;
     try {
       await navigator.clipboard.writeText(draftRoomId);
       setCopyLabel("Copied");
@@ -173,6 +173,12 @@ export default function HomeClient({
 
   return (
     <div className="doodle-shell text-zinc-950">
+      {errorMessage && (
+        <DoodleErrorPopup
+          message={errorMessage}
+          onClose={() => setErrorMessage(null)}
+        />
+      )}
       <div className="mx-auto max-w-5xl px-6 py-10 md:px-8 md:py-14">
         <div className="mb-14 text-center">
           <p className="doodle-pill mb-4 inline-flex items-center px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em]">
@@ -191,7 +197,7 @@ export default function HomeClient({
                   Create a new room
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-zinc-700">
-                  Pick a name, lock in a room ID, and share it with others to
+                  Pick a name, choose a room ID, and share it with others to
                   play
                 </p>
               </div>
@@ -203,7 +209,10 @@ export default function HomeClient({
             <input
               type="text"
               value={createPlayerName}
-              onChange={(e) => setCreatePlayerName(e.target.value)}
+              onChange={(e) => {
+                setCreatePlayerName(e.target.value);
+                localStorage.setItem("skriblix-create-name", e.target.value);
+              }}
               placeholder="Your name..."
               className="doodle-input min-w-48 w-full px-4 py-3 text-md"
               maxLength={20}
@@ -249,13 +258,15 @@ export default function HomeClient({
           <aside className="doodle-card p-8">
             <h2 className="text-3xl font-black tracking-tight">Join a room</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-700">
-              Enter the 6-digit room ID from your host and head straight to the
-              canvas.
+              Enter a 6-digit room ID to join an existing room
             </p>
             <input
               type="text"
               value={joinPlayerName}
-              onChange={(e) => setJoinPlayerName(e.target.value)}
+              onChange={(e) => {
+                setJoinPlayerName(e.target.value);
+                localStorage.setItem("skriblix-join-name", e.target.value);
+              }}
               placeholder="Your name..."
               className="doodle-input mt-5 w-full px-4 py-3 text-md"
               maxLength={20}
