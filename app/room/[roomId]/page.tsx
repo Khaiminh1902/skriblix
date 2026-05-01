@@ -53,14 +53,14 @@ export default function RoomPage() {
   const socketRef = useRef<any>(null);
   const copyResetRef = useRef<NodeJS.Timeout | null>(null);
 
-   useEffect(() => {
-     const playerName =
-       typeof window !== "undefined"
-         ? (localStorage.getItem("skriblix-join-name") ||
-             localStorage.getItem("skriblix-create-name") ||
-             "")
-         : "";
-     const socketIo = require("socket.io-client");
+  useEffect(() => {
+    const playerName =
+      typeof window !== "undefined"
+        ? localStorage.getItem("skriblix-join-name") ||
+          localStorage.getItem("skriblix-create-name") ||
+          ""
+        : "";
+    const socketIo = require("socket.io-client");
     const socket = socketIo();
     socketRef.current = socket;
 
@@ -117,13 +117,13 @@ export default function RoomPage() {
     }
   }, [room, roomId, router]);
 
-   const playerName =
-     typeof window !== "undefined"
-       ? (localStorage.getItem("skriblix-join-name") ||
-           localStorage.getItem("skriblix-create-name") ||
-           "")
-       : "";
-   const playerId = room?.players.find((p) => p.name === playerName)?.id || "";
+  const playerName =
+    typeof window !== "undefined"
+      ? localStorage.getItem("skriblix-join-name") ||
+        localStorage.getItem("skriblix-create-name") ||
+        ""
+      : "";
+  const playerId = room?.players.find((p) => p.name === playerName)?.id || "";
   const isHost = room?.hostId === playerId;
   const canStartGame = Boolean(
     room?.gameState === "waiting" && room.players.length >= 2 && isHost,
@@ -249,23 +249,27 @@ export default function RoomPage() {
                 <button
                   onClick={startGame}
                   disabled={!canStartGame}
-                  className="doodle-button px-6 py-4 text-lg font-bold uppercase tracking-[0.12em] cursor-pointer"
+                  className="doodle-button px-6 py-2 text-lg font-bold uppercase tracking-[0.12em] cursor-pointer"
                 >
                   {room.gameState === "countdown"
                     ? "Countdown Running"
                     : "Start Game"}
                 </button>
               ) : (
-                <div className="doodle-pill px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em]">
-                  Only host can start game
-                </div>
+                <button
+                  onClick={() => router.replace(`/room/${roomId}/game`)}
+                  disabled={room.players.length < 2}
+                  className="doodle-button doodle-button-secondary px-6 py-2 text-md font-bold uppercase tracking-[0.12em] cursor-pointer"
+                >
+                  Join
+                </button>
               )}
               <p className="text-sm text-zinc-700">
                 {room.players.length < 2
-                  ? "Waiting for one more player to join."
+                  ? "Waiting for one more player to join"
                   : isHost
-                    ? "Enough players are here. Start when everyone is ready."
-                    : "Wait for the host to start the game."}
+                    ? "Enough players are here. Start when everyone is ready"
+                    : "The game is ready. Join now!"}
               </p>
             </div>
           </section>

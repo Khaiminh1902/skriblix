@@ -192,7 +192,6 @@ export function setupSocket(httpServer: any) {
         const room = rooms.get(roomId);
 
         if (!room) return;
-        // Only the host can start the game
         if (room.hostId !== socket.id) {
           socket.emit("error", { message: "Only the host can start the game" });
           return;
