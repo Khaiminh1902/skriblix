@@ -478,7 +478,7 @@ export default function RoomGamePage() {
                   >
                     <div
                       className={`h-3 w-3 rounded-full border border-current ${
-                        roomPlayer.status === "connected"
+                        roomPlayer.status === "ready"
                           ? "bg-current"
                           : "bg-white"
                       }`}

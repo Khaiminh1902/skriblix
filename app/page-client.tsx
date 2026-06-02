@@ -64,12 +64,26 @@ export default function HomeClient({
     const s = socketIo();
     socketRef.current = s;
 
-     s.on("room_created", (data: any) => {
+    s.on("room_created", (data: any) => {
       const elapsed = Date.now() - pendingActionStartedAtRef.current;
       const remainingDelay = Math.max(0, TRANSITION_LOADING_MS - elapsed);
       pendingNavigationTimerRef.current = setTimeout(() => {
         router.push(`/room/${data.room.id}`);
       }, remainingDelay);
+    });
+
+    s.on("room_exists", (data: { roomId: string; exists: boolean }) => {
+      if (!data.exists) {
+        setPendingAction(null);
+        setErrorMessage("Room doesn't exist");
+        return;
+      }
+
+      pendingActionStartedAtRef.current = Date.now();
+      setPendingAction("join");
+      pendingNavigationTimerRef.current = setTimeout(() => {
+        router.push(`/room/${data.roomId}`);
+      }, TRANSITION_LOADING_MS);
     });
 
     s.on("error", (data: any) => {
@@ -88,6 +102,7 @@ export default function HomeClient({
       }
       s.off("room_joined");
       s.off("room_created");
+      s.off("room_exists");
       s.off("error");
       s.disconnect();
       socketRef.current = null;
@@ -125,11 +140,8 @@ export default function HomeClient({
       setErrorMessage("Please enter a 6-digit room ID");
       return;
     }
-    pendingActionStartedAtRef.current = Date.now();
-    setPendingAction("join");
-    pendingNavigationTimerRef.current = setTimeout(() => {
-      router.push(`/room/${normalizedRoomId}`);
-    }, TRANSITION_LOADING_MS);
+    setJoinRoomId(normalizedRoomId);
+    socketRef.current?.emit("check_room_exists", { roomId: normalizedRoomId });
   };
 
   const rerollRoomId = () => {

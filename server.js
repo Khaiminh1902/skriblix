@@ -128,6 +128,13 @@ function registerSocketHandlers(io) {
     io.to("lobby").emit("room_list", getRoomList());
   }
 
+  function areAllPlayersReady(room) {
+    return (
+      room.players.length >= 2 &&
+      room.players.every((player) => player.status === "ready")
+    );
+  }
+
   function startDrawingRound(roomId) {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
@@ -170,6 +177,52 @@ function registerSocketHandlers(io) {
     }
   }
 
+  function startPreGameCountdown(roomId) {
+    const room = rooms.get(roomId);
+    if (!room || room.gameState !== "waiting" || !areAllPlayersReady(room)) {
+      return;
+    }
+
+    clearGameTimers(roomId);
+    room.gameState = "countdown";
+    room.drawer = null;
+    room.currentWord = null;
+    room.drawings = [];
+    room.countdownEndsAt = Date.now() + PRE_GAME_COUNTDOWN_MS;
+    room.loadingEndsAt = null;
+    emitRoomState(roomId);
+
+    const countdownTimer = setTimeout(() => {
+      const activeRoom = rooms.get(roomId);
+      if (!activeRoom) return;
+      if (!areAllPlayersReady(activeRoom)) {
+        cancelPreGameIfNeeded(roomId);
+        return;
+      }
+
+      activeRoom.gameState = "starting";
+      activeRoom.countdownEndsAt = null;
+      activeRoom.loadingEndsAt = Date.now() + PRE_GAME_LOADING_MS;
+      emitRoomState(roomId);
+
+      const loadingTimer = setTimeout(() => {
+        const loadingRoom = rooms.get(roomId);
+        if (!loadingRoom) return;
+        if (!areAllPlayersReady(loadingRoom)) {
+          cancelPreGameIfNeeded(roomId);
+          return;
+        }
+
+        loadingRoom.drawer = loadingRoom.players[0].id;
+        startDrawingRound(roomId);
+      }, PRE_GAME_LOADING_MS);
+
+      gamePhaseTimers.set(roomId, { loadingTimer });
+    }, PRE_GAME_COUNTDOWN_MS);
+
+    gamePhaseTimers.set(roomId, { countdownTimer });
+  }
+
   io.on("connection", (socket) => {
     console.log("Player connected:", socket.id);
 
@@ -177,6 +230,13 @@ function registerSocketHandlers(io) {
       socket.join("lobby");
       socket.emit("lobby_joined", { playerId: socket.id });
       socket.emit("room_list", getRoomList());
+    });
+
+    socket.on("check_room_exists", ({ roomId }) => {
+      socket.emit("room_exists", {
+        roomId,
+        exists: rooms.has(roomId),
+      });
     });
 
     socket.on(
@@ -213,7 +273,7 @@ function registerSocketHandlers(io) {
               id: socket.id,
               playerKey,
               name: playerName,
-              status: "connected",
+              status: "not_ready",
             },
           ],
           drawer: null,
@@ -249,28 +309,31 @@ function registerSocketHandlers(io) {
 
       clearRoomCleanup(roomId);
 
-      if (room.gameState !== "waiting") {
+      const existingPlayer = room.players.find(
+        (player) => player.playerKey === playerKey,
+      );
+
+      if (!existingPlayer && room.gameState !== "waiting") {
         socket.emit("error", { message: "Game already in progress" });
         return;
       }
 
-      const existingPlayer = room.players.find(
-        (player) => player.playerKey === playerKey,
-      );
       if (existingPlayer) {
         const previousPlayerId = existingPlayer.id;
         existingPlayer.id = socket.id;
         existingPlayer.name = playerName;
-        existingPlayer.status = "connected";
         if (room.hostId === previousPlayerId) {
           room.hostId = socket.id;
+        }
+        if (room.drawer === previousPlayerId) {
+          room.drawer = socket.id;
         }
       } else {
         const player = {
           id: socket.id,
           playerKey,
           name: playerName,
-          status: "connected",
+          status: "not_ready",
         };
         room.players.push(player);
         io.to(roomId).emit("player_joined", { player });
@@ -298,9 +361,23 @@ function registerSocketHandlers(io) {
         io.to(roomId).emit("player_left", { playerId: socket.id });
         cancelPreGameIfNeeded(roomId);
         emitRoomState(roomId);
+        startPreGameCountdown(roomId);
       }
 
       io.to("lobby").emit("room_list", getRoomList());
+    });
+
+    socket.on("player_ready", ({ roomId }) => {
+      const room = rooms.get(roomId);
+
+      if (!room || room.gameState !== "waiting") return;
+
+      const player = room.players.find((roomPlayer) => roomPlayer.id === socket.id);
+      if (!player) return;
+
+      player.status = "ready";
+      emitRoomState(roomId);
+      startPreGameCountdown(roomId);
     });
 
     socket.on("start_game", ({ roomId }) => {
@@ -316,44 +393,11 @@ function registerSocketHandlers(io) {
         return;
       }
 
-      clearGameTimers(roomId);
-      room.gameState = "countdown";
-      room.drawer = null;
-      room.currentWord = null;
-      room.drawings = [];
-      room.countdownEndsAt = Date.now() + PRE_GAME_COUNTDOWN_MS;
-      room.loadingEndsAt = null;
+      room.players.forEach((player) => {
+        player.status = "ready";
+      });
       emitRoomState(roomId);
-
-      const countdownTimer = setTimeout(() => {
-        const activeRoom = rooms.get(roomId);
-        if (!activeRoom) return;
-        if (activeRoom.players.length < 2) {
-          cancelPreGameIfNeeded(roomId);
-          return;
-        }
-
-        activeRoom.gameState = "starting";
-        activeRoom.countdownEndsAt = null;
-        activeRoom.loadingEndsAt = Date.now() + PRE_GAME_LOADING_MS;
-        emitRoomState(roomId);
-
-        const loadingTimer = setTimeout(() => {
-          const loadingRoom = rooms.get(roomId);
-          if (!loadingRoom) return;
-          if (loadingRoom.players.length < 2) {
-            cancelPreGameIfNeeded(roomId);
-            return;
-          }
-
-          loadingRoom.drawer = loadingRoom.players[0].id;
-          startDrawingRound(roomId);
-        }, PRE_GAME_LOADING_MS);
-
-        gamePhaseTimers.set(roomId, { loadingTimer });
-      }, PRE_GAME_COUNTDOWN_MS);
-
-      gamePhaseTimers.set(roomId, { countdownTimer });
+      startPreGameCountdown(roomId);
     });
 
     socket.on("drawing", ({ roomId, drawing }) => {
@@ -421,6 +465,15 @@ function registerSocketHandlers(io) {
         const playerIndex = room.players.findIndex((player) => player.id === socket.id);
         if (playerIndex === -1) continue;
 
+        if (
+          room.gameState === "countdown" ||
+          room.gameState === "starting" ||
+          room.gameState === "drawing"
+        ) {
+          socket.leave(roomId);
+          continue;
+        }
+
         room.players.splice(playerIndex, 1);
         socket.leave(roomId);
 
@@ -433,6 +486,7 @@ function registerSocketHandlers(io) {
           io.to(roomId).emit("player_left", { playerId: socket.id });
           cancelPreGameIfNeeded(roomId);
           emitRoomState(roomId);
+          startPreGameCountdown(roomId);
         }
 
         io.to("lobby").emit("room_list", getRoomList());

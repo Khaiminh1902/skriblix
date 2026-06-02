@@ -47,6 +47,8 @@ export default function RoomPage() {
   const roomId = params.roomId || "";
 
   const [room, setRoom] = useState<Room | null>(null);
+  const [playerId, setPlayerId] = useState("");
+  const [countdownRemaining, setCountdownRemaining] = useState(5);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState("Copy");
 
@@ -73,10 +75,12 @@ export default function RoomPage() {
     });
 
     socket.on("room_joined", (data: any) => {
+      setPlayerId(data.playerId);
       setRoom(data.room);
     });
 
     socket.on("room_created", (data: any) => {
+      setPlayerId(data.playerId);
       setRoom(data.room);
     });
 
@@ -88,9 +92,7 @@ export default function RoomPage() {
       setRoom(data.room);
     });
 
-    socket.on("new_round", (data: any) => {
-      setRoom(data.room);
-    });
+    socket.on("new_round", () => {});
 
     socket.on("game_state_update", (data: any) => {
       setRoom(data.room);
@@ -117,20 +119,31 @@ export default function RoomPage() {
     }
   }, [room, roomId, router]);
 
-  const playerName =
-    typeof window !== "undefined"
-      ? localStorage.getItem("skriblix-join-name") ||
-        localStorage.getItem("skriblix-create-name") ||
-        ""
-      : "";
-  const playerId = room?.players.find((p) => p.name === playerName)?.id || "";
-  const isHost = room?.hostId === playerId;
-  const canStartGame = Boolean(
-    room?.gameState === "waiting" && room.players.length >= 2 && isHost,
-  );
+  useEffect(() => {
+    if (room?.gameState !== "countdown" || !room.countdownEndsAt) {
+      return;
+    }
 
-  const startGame = () => {
-    socketRef.current?.emit("start_game", { roomId });
+    const updateCountdown = () => {
+      const remainingMs = Math.max(0, room.countdownEndsAt! - Date.now());
+      setCountdownRemaining(Math.ceil(remainingMs / 1000));
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 250);
+    return () => clearInterval(timer);
+  }, [room?.countdownEndsAt, room?.gameState]);
+
+  const players = room?.players ?? [];
+  const currentPlayer = players.find((p) => p.id === playerId);
+  const isReady = currentPlayer?.status === "ready";
+  const readyPlayers = players.filter(
+    (roomPlayer) => roomPlayer.status === "ready",
+  );
+  const canReady = room?.gameState === "waiting" && !isReady;
+
+  const markReady = () => {
+    socketRef.current?.emit("player_ready", { roomId });
   };
 
   const leaveRoom = () => {
@@ -222,10 +235,10 @@ export default function RoomPage() {
                     Starting In
                   </p>
                   <p className="mt-4 text-7xl font-black tracking-tight md:text-8xl">
-                    --
+                    {countdownRemaining}
                   </p>
                   <p className="mt-4 text-sm text-zinc-600">
-                    The game opens right after the countdown finishes.
+                    The game opens right after the countdown finishes
                   </p>
                 </>
               ) : (
@@ -234,42 +247,38 @@ export default function RoomPage() {
                     Players Ready
                   </p>
                   <p className="mt-4 text-6xl font-black tracking-tight">
-                    {room.players.length}
-                    <span className="ml-2 text-2xl text-zinc-500">/ 2+</span>
+                    {readyPlayers.length}
+                    <span className="ml-2 text-2xl text-zinc-500">
+                      / {room.players.length}
+                    </span>
                   </p>
                   <p className="mt-4 text-sm text-zinc-600">
-                    Start unlocks once at least two players are in the room.
+                    Countdown starts when every player is ready
                   </p>
                 </>
               )}
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              {isHost ? (
-                <button
-                  onClick={startGame}
-                  disabled={!canStartGame}
-                  className="doodle-button px-6 py-2 text-lg font-bold uppercase tracking-[0.12em] cursor-pointer"
-                >
-                  {room.gameState === "countdown"
-                    ? "Countdown Running"
-                    : "Start Game"}
-                </button>
-              ) : (
-                <button
-                  onClick={() => router.replace(`/room/${roomId}/game`)}
-                  disabled={room.players.length < 2}
-                  className="doodle-button doodle-button-secondary px-6 py-2 text-md font-bold uppercase tracking-[0.12em] cursor-pointer"
-                >
-                  Join
-                </button>
-              )}
+              <button
+                onClick={markReady}
+                disabled={!canReady}
+                className="doodle-button doodle-button-secondary px-6 py-2 text-md font-bold uppercase tracking-[0.12em] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {room.gameState === "countdown"
+                  ? "Countdown Running"
+                  : isReady
+                    ? "Ready"
+                    : "Ready"}
+              </button>
               <p className="text-sm text-zinc-700">
                 {room.players.length < 2
                   ? "Waiting for one more player to join"
-                  : isHost
-                    ? "Enough players are here. Start when everyone is ready"
-                    : "The game is ready. Join now!"}
+                  : room.gameState === "countdown"
+                    ? "Everyone is ready. The game will open for all players"
+                    : isReady
+                      ? "Waiting for the rest of the room to giddy up"
+                      : "Ready up when you are set to play"}
               </p>
             </div>
           </section>
@@ -310,9 +319,8 @@ export default function RoomPage() {
                         {roomPlayer.name}
                       </p>
                       <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">
-                        {roomPlayer.id === room.hostId
-                          ? "Host"
-                          : roomPlayer.status || "Connected"}
+                        {roomPlayer.status === "ready" ? "READY" : "NOT READY"}
+                        {roomPlayer.id === room.hostId ? " - HOST" : ""}
                       </p>
                     </div>
                   </div>
