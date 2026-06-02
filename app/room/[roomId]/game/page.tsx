@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DoodleLoadingScreen } from "@/app/components/doodle-loading-screen";
 import { DoodleErrorPopup } from "@/app/components/doodle-error-popup";
@@ -22,6 +22,13 @@ interface RoomMessage {
   isCorrect: boolean;
 }
 
+interface DrawingSegment {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
 interface Room {
   id: string;
   theme: string;
@@ -29,7 +36,7 @@ interface Room {
   players: Player[];
   drawer: string | null;
   currentWord: string | null;
-  drawings: any[];
+  drawings: DrawingSegment[];
   messages: RoomMessage[];
   gameState: "waiting" | "countdown" | "starting" | "drawing";
   countdownEndsAt?: number | null;
@@ -68,6 +75,23 @@ export default function RoomGamePage() {
 
   const isDrawer = room?.drawer === playerId;
   const isSpectator = false;
+
+  const drawSegment = useCallback((drawing: DrawingSegment) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    ctx.moveTo(drawing.startX, drawing.startY);
+    ctx.lineTo(drawing.endX, drawing.endY);
+    ctx.stroke();
+  }, []);
 
   useEffect(() => {
     const playerName =
@@ -122,20 +146,7 @@ export default function RoomGamePage() {
     });
 
     socket.on("drawing_update", (data: any) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      ctx.beginPath();
-      ctx.moveTo(data.drawing.startX, data.drawing.startY);
-      ctx.lineTo(data.drawing.endX, data.drawing.endY);
-      ctx.stroke();
+      drawSegment(data.drawing);
     });
 
     socket.on("canvas_cleared", () => {
@@ -171,7 +182,22 @@ export default function RoomGamePage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [roomId, router]);
+  }, [drawSegment, roomId, router]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (room?.gameState !== "drawing") return;
+
+    room.drawings.forEach((drawing) => {
+      drawSegment(drawing);
+    });
+  }, [drawSegment, room?.drawings, room?.gameState]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -195,14 +221,20 @@ export default function RoomGamePage() {
 
     const getCanvasPos = (e: MouseEvent | TouchEvent) => {
       const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
       if ("touches" in e) {
         return {
-          x: e.touches[0].clientX - rect.left,
-          y: e.touches[0].clientY - rect.top,
+          x: (e.touches[0].clientX - rect.left) * scaleX,
+          y: (e.touches[0].clientY - rect.top) * scaleY,
         };
       }
 
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
     };
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -216,18 +248,12 @@ export default function RoomGamePage() {
       const pos = getCanvasPos(e);
       if (!lastPos) return;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      ctx.beginPath();
-      ctx.moveTo(lastPos.x, lastPos.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
+      drawSegment({
+        startX: lastPos.x,
+        startY: lastPos.y,
+        endX: pos.x,
+        endY: pos.y,
+      });
 
       socketRef.current?.emit("drawing", {
         roomId,
@@ -260,18 +286,12 @@ export default function RoomGamePage() {
       const pos = getCanvasPos(e);
       if (!lastPos) return;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      ctx.beginPath();
-      ctx.moveTo(lastPos.x, lastPos.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
+      drawSegment({
+        startX: lastPos.x,
+        startY: lastPos.y,
+        endX: pos.x,
+        endY: pos.y,
+      });
 
       socketRef.current?.emit("drawing", {
         roomId,
@@ -366,47 +386,37 @@ export default function RoomGamePage() {
             </p>
           </div>
         </div>
-
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
             <div className="doodle-card p-5 md:p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.14em] text-zinc-600">
-                    Theme:{" "}
-                    <span className="font-bold text-zinc-950 capitalize">
-                      {room.theme}
-                    </span>
-                  </p>
-                  <p className="mt-2 text-sm text-zinc-700">
-                    {isDrawer
-                      ? "You are the drawer!"
-                      : isSpectator
-                        ? "Spectating"
-                        : "Guess the word!"}
-                  </p>
-                </div>
-                <div className="text-right">
+              <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                {isDrawer ? (
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="text-sm uppercase tracking-[0.14em] text-zinc-600">
+                        Your word
+                      </p>
+                      <p className="rounded-xl border-2 border-zinc-950 bg-zinc-950 px-4 py-2 text-2xl font-black text-white shadow-[4px_4px_0_#111]">
+                        {room.currentWord ?? "???"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div />
+                )}
+                <div className="sm:text-right">
                   <p className="text-sm uppercase tracking-[0.14em] text-zinc-600">
                     Current Drawer
                   </p>
                   <p className="text-lg font-black text-zinc-950">
                     {room.players.find((p) => p.id === room.drawer)?.name ||
-                      "-"}
+                      "No players found"}
                   </p>
                 </div>
               </div>
 
               {isDrawer && (
                 <div className="mb-4">
-                  <div className="mb-2 flex items-center gap-4">
-                    <p className="text-sm uppercase tracking-[0.14em] text-zinc-600">
-                      Your word
-                    </p>
-                    <p className="rounded-xl border-2 border-zinc-950 bg-zinc-950 px-4 py-2 text-2xl font-black text-white shadow-[4px_4px_0_#111]">
-                      {room.currentWord ?? "???"}
-                    </p>
-                  </div>
                   <div className="flex items-center gap-3">
                     <p className="text-sm uppercase tracking-[0.14em] text-zinc-600">
                       Time left
@@ -424,39 +434,38 @@ export default function RoomGamePage() {
                 </div>
               )}
 
-              <div className="overflow-hidden rounded-2xl border-2 border-zinc-950 bg-white shadow-[4px_4px_0_#111]">
+              <div className="relative overflow-hidden rounded-2xl border-2 border-zinc-950 bg-white shadow-[4px_4px_0_#111]">
                 <canvas
                   ref={canvasRef}
                   width={800}
                   height={500}
-                  className="w-full cursor-crosshair"
+                  className="block h-auto max-w-full cursor-crosshair"
                   style={{ touchAction: "none" }}
                 />
-              </div>
-
-              {isDrawer ? (
-                <div className="mt-4 flex gap-3">
+                {isDrawer ? (
                   <button
+                    type="button"
+                    aria-label="Clear canvas"
+                    title="Clear canvas"
                     onClick={() => clearCanvasRef.current?.()}
-                    className="doodle-button doodle-button-secondary px-4 py-3 font-bold uppercase tracking-[0.12em] cursor-pointer"
+                    className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-xl border-2 border-zinc-950 bg-white text-zinc-950 shadow-[3px_3px_0_#111] transition hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_#111] cursor-pointer"
                   >
-                    Clear Canvas
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="doodle-card p-4">
-              <div className="flex items-center gap-3">
-                <p className="text-sm text-zinc-700">
-                  Players: {room.players.length}
-                </p>
-                {room.drawer ? (
-                  <button
-                    onClick={() => nextWordRef.current?.()}
-                    className="doodle-button doodle-button-secondary px-6 py-3 font-bold uppercase tracking-[0.12em] cursor-pointer"
-                  >
-                    Next Word
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2.25"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <path d="M6 6l1 16h10l1-16" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
                   </button>
                 ) : null}
               </div>
@@ -498,7 +507,6 @@ export default function RoomGamePage() {
                 ))}
               </div>
             </div>
-
             <div className="doodle-card flex min-h-100 flex-1 flex-col p-4">
               <h3 className="mb-3 text-lg font-black">Chat</h3>
               <div className="mb-4 max-h-75 flex-1 space-y-2 overflow-y-auto">
@@ -546,18 +554,21 @@ export default function RoomGamePage() {
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Type your guess..."
+                    placeholder="Type a message..."
                     className="doodle-input min-w-0 flex-1 px-4 py-3 text-sm"
                     maxLength={120}
                   />
                   <button
                     type="submit"
-                    className="doodle-button px-4 py-3 font-bold uppercase tracking-[0.12em] cursor-pointer"
+                    className="doodle-button doodle-button-secondary px-4 py-3 font-bold uppercase tracking-[0.12em] cursor-pointer text-sm"
                   >
                     Send
                   </button>
                 </form>
               ) : null}
+            </div>
+            <div className="flex justify-center items-center text-xl font-bold doodle-button doodle-button-secondary w-30 mx-auto h-12 cursor-pointer mt-6">
+              GUESS
             </div>
           </div>
         </div>

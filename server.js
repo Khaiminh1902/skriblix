@@ -112,6 +112,15 @@ function registerSocketHandlers(io) {
     return doodleWords[Math.floor(Math.random() * doodleWords.length)];
   }
 
+  function getRandomDrawerId(players, previousDrawerId = null) {
+    const eligiblePlayers =
+      players.length > 1
+        ? players.filter((player) => player.id !== previousDrawerId)
+        : players;
+
+    return eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)]?.id;
+  }
+
   function generateRoomId() {
     let roomId = "";
     do {
@@ -139,10 +148,7 @@ function registerSocketHandlers(io) {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
 
-    const hasCurrentDrawer = room.players.some((player) => player.id === room.drawer);
-    if (!hasCurrentDrawer) {
-      room.drawer = room.players[0].id;
-    }
+    room.drawer = getRandomDrawerId(room.players, room.drawer);
 
     room.currentWord = getRandomWord();
     room.drawings = [];
@@ -213,7 +219,6 @@ function registerSocketHandlers(io) {
           return;
         }
 
-        loadingRoom.drawer = loadingRoom.players[0].id;
         startDrawingRound(roomId);
       }, PRE_GAME_LOADING_MS);
 
@@ -413,7 +418,12 @@ function registerSocketHandlers(io) {
     });
 
     socket.on("clear_canvas", ({ roomId }) => {
-      socket.to(roomId).emit("canvas_cleared");
+      const room = rooms.get(roomId);
+      if (room) {
+        room.drawings = [];
+        emitRoomState(roomId);
+      }
+      io.to(roomId).emit("canvas_cleared");
     });
 
     socket.on("chat_message", ({ roomId, message, playerId }) => {
@@ -437,6 +447,7 @@ function registerSocketHandlers(io) {
       if (isCorrectGuess) {
         chatMsg.isCorrect = true;
         room.gameState = "waiting";
+        room.drawings = [];
         io.to(roomId).emit("correct_guess", { playerId, word: room.currentWord });
         io.to(roomId).emit("game_state_update", { room });
       }
@@ -449,12 +460,6 @@ function registerSocketHandlers(io) {
 
       if (!room) return;
 
-      const currentDrawerIndex = room.players.findIndex(
-        (player) => player.id === room.drawer,
-      );
-      const nextDrawerIndex = (currentDrawerIndex + 1) % room.players.length;
-
-      room.drawer = room.players[nextDrawerIndex].id;
       startDrawingRound(roomId);
     });
 

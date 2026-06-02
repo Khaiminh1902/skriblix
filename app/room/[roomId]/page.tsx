@@ -171,7 +171,7 @@ export default function RoomPage() {
       <DoodleLoadingScreen
         badge="Joining"
         title="Opening the waiting room"
-        subtitle="Checking the room code and pulling down the latest player list."
+        subtitle="Checking the room code and pulling down the latest player list"
         roomId={roomId}
       />
     );
@@ -225,7 +225,7 @@ export default function RoomPage() {
             <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-700 md:text-base">
               {room.gameState === "countdown"
                 ? "The round is about to start. Hold tight while everyone enters together."
-                : "You need at least two players before the game can start. Share the room code and wait for the crew to assemble."}
+                : "You need at least two players before the game can start. Share the room code and wait for the crew to assemble"}
             </p>
 
             <div className="mt-8 rounded-4xl border-2 border-zinc-950 bg-white px-6 py-8 text-center shadow-[6px_6px_0_#111]">
@@ -266,7 +266,7 @@ export default function RoomPage() {
                 className="doodle-button doodle-button-secondary px-6 py-2 text-md font-bold uppercase tracking-[0.12em] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {room.gameState === "countdown"
-                  ? "Countdown Running"
+                  ? "Starting..."
                   : isReady
                     ? "Ready"
                     : "Ready"}

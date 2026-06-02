@@ -80,6 +80,15 @@ export function setupSocket(httpServer: any) {
       return doodleWords[Math.floor(Math.random() * doodleWords.length)];
     }
 
+    function getRandomDrawerId(players: any[], previousDrawerId: string | null = null) {
+      const eligiblePlayers =
+        players.length > 1
+          ? players.filter((player: any) => player.id !== previousDrawerId)
+          : players;
+
+      return eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)]?.id;
+    }
+
     function generateRoomId() {
       const words = [
         "cat",
@@ -138,8 +147,9 @@ export function setupSocket(httpServer: any) {
 
       clearGameTimer(roomId);
       room.gameState = "drawing";
-      room.drawer = room.players[0].id;
+      room.drawer = getRandomDrawerId(room.players, room.drawer);
       room.currentWord = getRandomWord(room.theme);
+      room.drawings = [];
       room.countdownEndsAt = null;
 
       socketIOServer.to(roomId).emit("game_started", { room });
@@ -336,7 +346,12 @@ export function setupSocket(httpServer: any) {
 
       socket.on("clear_canvas", (data: { roomId: string }) => {
         const { roomId } = data;
-        socket.to(roomId).emit("canvas_cleared");
+        const room = rooms.get(roomId);
+        if (room) {
+          room.drawings = [];
+          emitRoomState(roomId);
+        }
+        socketIOServer.to(roomId).emit("canvas_cleared");
       });
 
       socket.on(
@@ -363,6 +378,7 @@ export function setupSocket(httpServer: any) {
           if (isCorrectGuess) {
             chatMsg.isCorrect = true;
             room.gameState = "waiting";
+            room.drawings = [];
             socketIOServer
               .to(roomId)
               .emit("correct_guess", { playerId, word: room.currentWord });
@@ -379,12 +395,7 @@ export function setupSocket(httpServer: any) {
 
         if (!room) return;
 
-        const currentDrawerIndex = room.players.findIndex(
-          (p: any) => p.id === room.drawer,
-        );
-        const nextDrawerIndex = (currentDrawerIndex + 1) % room.players.length;
-
-        room.drawer = room.players[nextDrawerIndex].id;
+        room.drawer = getRandomDrawerId(room.players, room.drawer);
         room.currentWord = getRandomWord(room.theme);
         room.gameState = "drawing";
         room.drawings = [];
