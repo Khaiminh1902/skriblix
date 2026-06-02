@@ -4,6 +4,7 @@ html,
 body {
   min-height: 100%;
   overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 :root {
@@ -36,9 +37,19 @@ body {
 body {
   background-color: #f8f6ef;
   background-image:
-    radial-gradient(circle at 20px 20px, rgba(0, 0, 0, 0.04) 1px, transparent 0),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 237, 228, 0.92));
-  background-size: 28px 28px, 100% 100%;
+    radial-gradient(
+      circle at 20px 20px,
+      rgba(0, 0, 0, 0.04) 1px,
+      transparent 0
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92),
+      rgba(240, 237, 228, 0.92)
+    );
+  background-size:
+    28px 28px,
+    100% 100%;
   background-repeat: repeat, no-repeat;
 }
 
@@ -52,13 +63,12 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 26px,
-      rgba(0, 0, 0, 0.035) 27px
-    );
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 26px,
+    rgba(0, 0, 0, 0.035) 27px
+  );
   opacity: 0.75;
 }
 
@@ -143,14 +153,13 @@ body {
   height: 24px;
   border: 2px solid #111111;
   border-radius: 999px;
-  background:
-    repeating-linear-gradient(
-      -14deg,
-      #ffffff 0,
-      #ffffff 8px,
-      #111111 8px,
-      #111111 10px
-    );
+  background: repeating-linear-gradient(
+    -14deg,
+    #ffffff 0,
+    #ffffff 8px,
+    #111111 8px,
+    #111111 10px
+  );
   transform: rotate(-8deg);
 }
 

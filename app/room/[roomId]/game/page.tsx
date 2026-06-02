@@ -393,10 +393,10 @@ export default function RoomGamePage() {
                 {isDrawer ? (
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <p className="text-sm uppercase tracking-[0.14em] text-zinc-600">
+                      <p className="text-sm uppercase font-semibold tracking-[0.14em] text-zinc-600">
                         Your word
                       </p>
-                      <p className="rounded-xl border-2 border-zinc-950 bg-zinc-950 px-4 py-2 text-2xl font-black text-white shadow-[4px_4px_0_#111]">
+                      <p className="rounded-xl border-zinc-950 bg-zinc-950 px-4 py-1.5 text-[24px] font-black text-white uppercase">
                         {room.currentWord ?? "???"}
                       </p>
                     </div>
@@ -418,7 +418,7 @@ export default function RoomGamePage() {
               {isDrawer && (
                 <div className="mb-4">
                   <div className="flex items-center gap-3">
-                    <p className="text-sm uppercase tracking-[0.14em] text-zinc-600">
+                    <p className="text-sm uppercase tracking-[0.14em] text-zinc-600 font-semibold">
                       Time left
                     </p>
                     <div className="h-3 flex-1 overflow-hidden rounded-full border-2 border-zinc-950 bg-white">
