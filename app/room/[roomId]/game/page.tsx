@@ -95,18 +95,15 @@ export default function RoomGamePage() {
 
   useEffect(() => {
     let playerName = "";
+
     if (typeof window !== "undefined") {
-      const sessionName = window.sessionStorage.getItem(
-        "skriblix-current-room-player-name",
-      );
-      if (sessionName) {
-        playerName = sessionName;
-        window.sessionStorage.removeItem("skriblix-current-room-player-name");
-      } else {
+      const action = sessionStorage.getItem("skriblix-room-action");
+
+      if (action === "create") {
         playerName =
-          localStorage.getItem("skriblix-join-name") ||
-          localStorage.getItem("skriblix-create-name") ||
-          "";
+          sessionStorage.getItem("skriblix-create-player-name") || "";
+      } else if (action === "join") {
+        playerName = sessionStorage.getItem("skriblix-join-player-name") || "";
       }
     }
     const socketIo = require("socket.io-client");

@@ -49,15 +49,10 @@ export default function HomeClient({
     null,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const createPlayerNameRef = useRef("");
   const copyResetRef = useRef<NodeJS.Timeout | null>(null);
   const pendingNavigationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingActionStartedAtRef = useRef<number>(0);
   const socketRef = useRef<any>(null);
-
-  useEffect(() => {
-    createPlayerNameRef.current = createPlayerName;
-  }, [createPlayerName]);
 
   useEffect(() => {
     const socketIo = require("socket.io-client");
@@ -65,12 +60,6 @@ export default function HomeClient({
     socketRef.current = s;
 
     s.on("room_created", (data: any) => {
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(
-          "skriblix-current-room-player-name",
-          createPlayerNameRef.current,
-        );
-      }
       const elapsed = Date.now() - pendingActionStartedAtRef.current;
       const remainingDelay = Math.max(0, TRANSITION_LOADING_MS - elapsed);
       pendingNavigationTimerRef.current = setTimeout(() => {
@@ -117,16 +106,24 @@ export default function HomeClient({
 
   const createRoom = () => {
     const name = createPlayerName.trim();
+
     if (!name) {
       setErrorMessage("Please enter your name");
       return;
     }
+
     if (!draftRoomId.trim()) {
       setErrorMessage("Please choose a room ID");
       return;
     }
+
+    sessionStorage.setItem("skriblix-create-player-name", name);
+
+    sessionStorage.setItem("skriblix-room-action", "create");
+
     pendingActionStartedAtRef.current = Date.now();
     setPendingAction("create");
+
     socketRef.current?.emit("create_room", {
       playerName: name,
       playerKey: getPlayerKey(),
@@ -137,17 +134,28 @@ export default function HomeClient({
 
   const joinRoom = () => {
     const name = joinPlayerName.trim();
+
     if (!name) {
       setErrorMessage("Please enter your name");
       return;
     }
+
     const normalizedRoomId = joinRoomId.replace(/\D/g, "").slice(0, 6);
+
     if (normalizedRoomId.length !== 6) {
       setErrorMessage("Please enter a 6-digit room ID");
       return;
     }
+
+    sessionStorage.setItem("skriblix-join-player-name", name);
+
+    sessionStorage.setItem("skriblix-room-action", "join");
+
     setJoinRoomId(normalizedRoomId);
-    socketRef.current?.emit("check_room_exists", { roomId: normalizedRoomId });
+
+    socketRef.current?.emit("check_room_exists", {
+      roomId: normalizedRoomId,
+    });
   };
 
   const rerollRoomId = () => {

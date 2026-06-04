@@ -56,12 +56,18 @@ export default function RoomPage() {
   const copyResetRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const playerName =
-      typeof window !== "undefined"
-        ? localStorage.getItem("skriblix-join-name") ||
-          localStorage.getItem("skriblix-create-name") ||
-          ""
-        : "";
+    let playerName = "";
+
+    if (typeof window !== "undefined") {
+      const action = sessionStorage.getItem("skriblix-room-action");
+
+      if (action === "create") {
+        playerName =
+          sessionStorage.getItem("skriblix-create-player-name") || "";
+      } else if (action === "join") {
+        playerName = sessionStorage.getItem("skriblix-join-player-name") || "";
+      }
+    }
     const socketIo = require("socket.io-client");
     const socket = socketIo();
     socketRef.current = socket;
