@@ -224,7 +224,7 @@ export default function RoomPage() {
             </h2>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-700 md:text-base">
               {room.gameState === "countdown"
-                ? "The round is about to start. Hold tight while everyone enters together."
+                ? "The round is about to start. Hold tight while everyone enters together"
                 : "You need at least two players before the game can start. Share the room code and wait for the crew to assemble"}
             </p>
 
