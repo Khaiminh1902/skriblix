@@ -59,7 +59,7 @@ export default function RoomGamePage() {
   const params = useParams<{ roomId: string }>();
   const router = useRouter();
   const roomId = params.roomId || "";
-
+  const [isOpen, setIsOpen] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(() => Date.now());
@@ -581,9 +581,49 @@ export default function RoomGamePage() {
                 </form>
               ) : null}
             </div>
-            <div className="flex justify-center items-center text-xl font-bold doodle-button doodle-button-secondary w-30 mx-auto h-12 cursor-pointer mt-6">
-              GUESS
+            <div>
+              <button
+                type="button"
+                className="flex justify-center items-center text-xl font-bold doodle-button doodle-button-secondary w-30 mx-auto h-12 mt-6 cursor-pointer"
+                onClick={() => setIsOpen(true)}
+              >
+                GUESS
+              </button>
             </div>
+            {isOpen && (
+              <div
+                className="fixed inset-0 flex items-center justify-center bg-black/40"
+                onClick={() => setIsOpen(false)}
+              >
+                <div
+                  className="relative bg-white p-8 rounded-lg doodle-card"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    className="absolute top-2 right-4.5 text-xl font-bold cursor-pointer"
+                    onClick={() => setIsOpen(false)}
+                    aria-label="Close modal"
+                  >
+                    ×
+                  </button>
+
+                  <h2 className="text-2xl font-bold mb-6 flex items-center justify-center">
+                    YOUR GUESS
+                  </h2>
+
+                  <div>
+                    <input
+                      className="border-2 p-2 rounded-xl w-65 placeholder:text-[15px] text-[15px]"
+                      placeholder="Your guess..."
+                    />
+                  </div>
+
+                  <button className="mt-5 px-4 py-2 rounded doodle-button doodle-button-secondary flex items-center justify-center text-center w-full cursor-pointer">
+                    Submit
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
