@@ -19,15 +19,10 @@ function registerSocketHandlers(io) {
   const PRE_GAME_LOADING_MS = 1500;
   const DRAWING_ROUND_MS = 60 * 1000;
 
-  // Normalize a string for comparison: remove spaces, punctuation, convert to lowercase
   function normalizeGuess(text) {
-    return text
-      .toLowerCase()
-      .replace(/\s+/g, "") // Remove all spaces
-      .replace(/[^\w]/g, ""); // Remove non-word characters (punctuation, etc.)
+    return text.toLowerCase().replace(/\s+/g, "").replace(/[^\w]/g, "");
   }
 
-  // Check if guess matches the answer word
   function isCorrectGuess(guess, answer) {
     const normalizedGuess = normalizeGuess(guess);
     const normalizedAnswer = normalizeGuess(answer);

@@ -9,15 +9,10 @@ import { DoodleErrorPopup } from "@/app/components/doodle-error-popup";
 
 const PLAYER_KEY_STORAGE_KEY = "skriblix-player-key";
 
-// Normalize a string for comparison: remove spaces, punctuation, convert to lowercase
 function normalizeGuess(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, "") // Remove all spaces
-    .replace(/[^\w]/g, ""); // Remove non-word characters (punctuation, etc.)
+  return text.toLowerCase().replace(/\s+/g, "").replace(/[^\w]/g, "");
 }
 
-// Check if guess matches the answer word
 function isCorrectGuess(guess: string, answer: string): boolean {
   const normalizedGuess = normalizeGuess(guess);
   const normalizedAnswer = normalizeGuess(answer);
@@ -398,7 +393,6 @@ export default function RoomGamePage() {
     setGuessResult(isCorrect ? "correct" : "incorrect");
     setGuess("");
 
-    // Auto-close modal after feedback
     setTimeout(() => {
       setIsOpen(false);
       setGuessResult(null);
@@ -563,7 +557,7 @@ export default function RoomGamePage() {
             </div>
             <div className="doodle-card flex min-h-100 flex-1 flex-col p-4">
               <h3 className="mb-3 text-lg font-black">Chat</h3>
-              <div className="mb-4 max-h-75 flex-1 space-y-2 overflow-y-auto">
+              <div className="mb-4 h-65 space-y-2 overflow-y-auto thin-black-scrollbar">
                 {room.messages.length === 0 ? (
                   <p className="text-sm text-zinc-600">
                     No messages yet. Start chatting!
@@ -662,7 +656,7 @@ export default function RoomGamePage() {
                       }`}
                     >
                       {guessResult === "correct"
-                        ? "You guessed correct! ✅"
+                        ? "You guessed correct!"
                         : "Not quite! Try again!"}
                     </div>
                   ) : (

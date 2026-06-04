@@ -184,6 +184,25 @@ body {
   animation: doodle-swipe 1.4s infinite ease-in-out;
 }
 
+.thin-black-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #111111 transparent;
+}
+
+.thin-black-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.thin-black-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-black-scrollbar::-webkit-scrollbar-thumb {
+  background: #111111;
+  border-radius: 999px;
+}
+
 @keyframes doodle-bounce {
   0%,
   80%,
