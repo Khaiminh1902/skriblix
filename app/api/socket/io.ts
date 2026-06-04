@@ -34,59 +34,63 @@ export function setupSocket(httpServer: any) {
     }
 
     const doodleWords = [
-      "cat",
-      "dog",
-      "house",
-      "tree",
-      "flower",
-      "sun",
-      "moon",
-      "star",
-      "cloud",
-      "bird",
-      "fish",
-      "car",
-      "bike",
-      "ball",
-      "apple",
-      "pizza",
-      "cake",
-      "cup",
-      "hat",
-      "shoe",
-      "book",
-      "pen",
-      "heart",
-      "star",
-      "fish",
-      "boat",
-      "plane",
-      "train",
-      "bus",
-      "clock",
-      "key",
-      "door",
-      "window",
-      "chair",
-      "table",
-      "bed",
-      "lamp",
-      "phone",
-      "camera",
-      "guitar",
+      "wifi",
+      "gravity",
+      "black hole",
+      "taxes",
+      "sigma",
+      "touch grass",
+      "shrek",
+      "doge",
+      "404 error",
+      "loading screen",
+      "captcha",
+      "chaos",
+      "broken truck",
+      "inflation",
+      "deja vu",
+      "Mark Zuckerberg",
+      "Tesla",
+      "America",
+      "Elon Musk",
+      "gigachad",
+      "capitalism",
+      "panic attack",
+      "unsubscribe",
+      "death",
+      "rage quit",
+      "clickbait",
+      "speedrun",
+      "banana",
+      "pigeon",
+      "Mr Beast",
+      "Easter egg",
+      "tax evasion",
+      "pirate",
+      "dinosaur",
+      "democracy",
+      "Rome",
+      "human",
+      "social anxiety",
+      "NPC",
+      "zombie",
     ];
 
     function getRandomWord(theme: string) {
       return doodleWords[Math.floor(Math.random() * doodleWords.length)];
     }
 
-    function getRandomDrawerId(players: any[], previousDrawerId: string | null = null) {
+    function getRandomDrawerId(
+      players: any[],
+      previousDrawerId: string | null = null,
+    ) {
       const eligiblePlayers =
         players.length > 1
           ? players.filter((player: any) => player.id !== previousDrawerId)
           : players;
 
-      return eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)]?.id;
+      return eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)]
+        ?.id;
     }
 
     function generateRoomId() {
@@ -229,51 +233,54 @@ export function setupSocket(httpServer: any) {
         },
       );
 
-      socket.on("join_room", (data: { roomId: string; playerName: string; playerKey?: string }) => {
-        const { roomId, playerName, playerKey } = data;
-        const room = rooms.get(roomId);
+      socket.on(
+        "join_room",
+        (data: { roomId: string; playerName: string; playerKey?: string }) => {
+          const { roomId, playerName, playerKey } = data;
+          const room = rooms.get(roomId);
 
-        if (!room) {
-          socket.emit("error", { message: "Room not found" });
-          return;
-        }
-
-        const existingPlayer = playerKey
-          ? room.players.find((player: any) => player.playerKey === playerKey)
-          : null;
-
-        if (!existingPlayer && room.gameState !== "waiting") {
-          socket.emit("error", { message: "Game already in progress" });
-          return;
-        }
-
-        const player = existingPlayer || {
-          id: socket.id,
-          playerKey,
-          name: playerName,
-          status: "not_ready",
-        };
-        if (existingPlayer) {
-          const previousPlayerId = existingPlayer.id;
-          existingPlayer.id = socket.id;
-          existingPlayer.name = playerName;
-          if (room.hostId === previousPlayerId) {
-            room.hostId = socket.id;
+          if (!room) {
+            socket.emit("error", { message: "Room not found" });
+            return;
           }
-          if (room.drawer === previousPlayerId) {
-            room.drawer = socket.id;
-          }
-        } else {
-          room.players.push(player);
-        }
-        socket.join(roomId);
 
-        socket.emit("room_joined", { room, playerId: socket.id });
-        if (!existingPlayer) {
-          socketIOServer.to(roomId).emit("player_joined", { player });
-        }
-        emitRoomState(roomId);
-      });
+          const existingPlayer = playerKey
+            ? room.players.find((player: any) => player.playerKey === playerKey)
+            : null;
+
+          if (!existingPlayer && room.gameState !== "waiting") {
+            socket.emit("error", { message: "Game already in progress" });
+            return;
+          }
+
+          const player = existingPlayer || {
+            id: socket.id,
+            playerKey,
+            name: playerName,
+            status: "not_ready",
+          };
+          if (existingPlayer) {
+            const previousPlayerId = existingPlayer.id;
+            existingPlayer.id = socket.id;
+            existingPlayer.name = playerName;
+            if (room.hostId === previousPlayerId) {
+              room.hostId = socket.id;
+            }
+            if (room.drawer === previousPlayerId) {
+              room.drawer = socket.id;
+            }
+          } else {
+            room.players.push(player);
+          }
+          socket.join(roomId);
+
+          socket.emit("room_joined", { room, playerId: socket.id });
+          if (!existingPlayer) {
+            socketIOServer.to(roomId).emit("player_joined", { player });
+          }
+          emitRoomState(roomId);
+        },
+      );
 
       socket.on("leave_room", (data: { roomId: string }) => {
         const { roomId } = data;
@@ -302,7 +309,9 @@ export function setupSocket(httpServer: any) {
 
         if (!room || room.gameState !== "waiting") return;
 
-        const player = room.players.find((roomPlayer: any) => roomPlayer.id === socket.id);
+        const player = room.players.find(
+          (roomPlayer: any) => roomPlayer.id === socket.id,
+        );
         if (!player) return;
 
         player.status = "ready";

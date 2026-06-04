@@ -66,46 +66,46 @@ function registerSocketHandlers(io) {
   }
 
   const doodleWords = [
-    "cat",
-    "dog",
-    "house",
-    "tree",
-    "flower",
-    "sun",
-    "moon",
-    "star",
-    "cloud",
-    "bird",
-    "fish",
-    "car",
-    "bike",
-    "ball",
-    "apple",
-    "pizza",
-    "cake",
-    "cup",
-    "hat",
-    "shoe",
-    "book",
-    "pen",
-    "heart",
-    "star",
-    "fish",
-    "boat",
-    "plane",
-    "train",
-    "bus",
-    "clock",
-    "key",
-    "door",
-    "window",
-    "chair",
-    "table",
-    "bed",
-    "lamp",
-    "phone",
-    "camera",
-    "guitar",
+    "wifi",
+    "gravity",
+    "black hole",
+    "taxes",
+    "sigma",
+    "touch grass",
+    "shrek",
+    "doge",
+    "404 error",
+    "loading screen",
+    "captcha",
+    "chaos",
+    "broken truck",
+    "inflation",
+    "deja vu",
+    "Mark Zuckerberg",
+    "Tesla",
+    "America",
+    "Elon Musk",
+    "gigachad",
+    "capitalism",
+    "panic attack",
+    "unsubscribe",
+    "death",
+    "rage quit",
+    "clickbait",
+    "speedrun",
+    "banana",
+    "pigeon",
+    "Mr Beast",
+    "Easter egg",
+    "tax evasion",
+    "pirate",
+    "dinosaur",
+    "democracy",
+    "Rome",
+    "human",
+    "social anxiety",
+    "NPC",
+    "zombie",
   ];
 
   function getRandomWord() {
@@ -118,7 +118,8 @@ function registerSocketHandlers(io) {
         ? players.filter((player) => player.id !== previousDrawerId)
         : players;
 
-    return eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)]?.id;
+    return eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)]
+      ?.id;
   }
 
   function generateRoomId() {
@@ -377,7 +378,9 @@ function registerSocketHandlers(io) {
 
       if (!room || room.gameState !== "waiting") return;
 
-      const player = room.players.find((roomPlayer) => roomPlayer.id === socket.id);
+      const player = room.players.find(
+        (roomPlayer) => roomPlayer.id === socket.id,
+      );
       if (!player) return;
 
       player.status = "ready";
@@ -448,7 +451,10 @@ function registerSocketHandlers(io) {
         chatMsg.isCorrect = true;
         room.gameState = "waiting";
         room.drawings = [];
-        io.to(roomId).emit("correct_guess", { playerId, word: room.currentWord });
+        io.to(roomId).emit("correct_guess", {
+          playerId,
+          word: room.currentWord,
+        });
         io.to(roomId).emit("game_state_update", { room });
       }
 
@@ -467,7 +473,9 @@ function registerSocketHandlers(io) {
       console.log("Player disconnected:", socket.id);
 
       for (const [roomId, room] of rooms.entries()) {
-        const playerIndex = room.players.findIndex((player) => player.id === socket.id);
+        const playerIndex = room.players.findIndex(
+          (player) => player.id === socket.id,
+        );
         if (playerIndex === -1) continue;
 
         if (

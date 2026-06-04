@@ -94,12 +94,24 @@ export default function RoomGamePage() {
   }, []);
 
   useEffect(() => {
-    const playerName =
-      typeof window !== "undefined"
-        ? localStorage.getItem("skriblix-join-name") ||
+    let playerName = "";
+    if (typeof window !== "undefined") {
+      // First check for session storage value set by lobby after room creation
+      const sessionName = window.sessionStorage.getItem(
+        "skriblix-current-room-player-name"
+      );
+      if (sessionName) {
+        playerName = sessionName;
+        // Clear it so it's only used once
+        window.sessionStorage.removeItem("skriblix-current-room-player-name");
+      } else {
+        // Fall back to original logic
+        playerName =
+          localStorage.getItem("skriblix-join-name") ||
           localStorage.getItem("skriblix-create-name") ||
-          ""
-        : "";
+          "";
+      }
+    }
     const socketIo = require("socket.io-client");
     const socket = socketIo();
     socketRef.current = socket;
