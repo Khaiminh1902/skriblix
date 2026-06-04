@@ -17,6 +17,7 @@ function registerSocketHandlers(io) {
   const EMPTY_ROOM_TTL_MS = 60 * 1000;
   const PRE_GAME_COUNTDOWN_MS = 5 * 1000;
   const PRE_GAME_LOADING_MS = 1500;
+  const DRAWING_ROUND_MS = 60 * 1000;
 
   function clearRoomCleanup(roomId) {
     const timer = roomCleanupTimers.get(roomId);
@@ -50,6 +51,10 @@ function registerSocketHandlers(io) {
 
     if (timers.loadingTimer) {
       clearTimeout(timers.loadingTimer);
+    }
+
+    if (timers.drawingTimer) {
+      clearTimeout(timers.drawingTimer);
     }
 
     gamePhaseTimers.delete(roomId);
@@ -150,14 +155,22 @@ function registerSocketHandlers(io) {
     if (!room || room.players.length === 0) return;
 
     room.drawer = getRandomDrawerId(room.players, room.drawer);
-
     room.currentWord = getRandomWord();
     room.drawings = [];
     room.gameState = "drawing";
-    room.countdownEndsAt = null;
+    room.countdownEndsAt = Date.now() + DRAWING_ROUND_MS;
     room.loadingEndsAt = null;
 
     clearGameTimers(roomId);
+
+    const drawingTimer = setTimeout(() => {
+      const activeRoom = rooms.get(roomId);
+      if (!activeRoom || activeRoom.gameState !== "drawing") return;
+      startDrawingRound(roomId);
+    }, DRAWING_ROUND_MS);
+
+    gamePhaseTimers.set(roomId, { drawingTimer });
+
     io.to(roomId).emit("game_started", { room });
     io.to(roomId).emit("new_round", {
       drawerId: room.drawer,
@@ -451,6 +464,9 @@ function registerSocketHandlers(io) {
         chatMsg.isCorrect = true;
         room.gameState = "waiting";
         room.drawings = [];
+        room.countdownEndsAt = null;
+        room.loadingEndsAt = null;
+        clearGameTimers(roomId);
         io.to(roomId).emit("correct_guess", {
           playerId,
           word: room.currentWord,

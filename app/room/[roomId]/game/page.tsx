@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DoodleLoadingScreen } from "@/app/components/doodle-loading-screen";
 import { DoodleErrorPopup } from "@/app/components/doodle-error-popup";
@@ -62,7 +62,7 @@ export default function RoomGamePage() {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [message, setMessage] = useState("");
-  const [roundCountdown, setRoundCountdown] = useState(60);
+  const [now, setNow] = useState(() => Date.now());
   const [playerId, setPlayerId] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -98,7 +98,7 @@ export default function RoomGamePage() {
     if (typeof window !== "undefined") {
       // First check for session storage value set by lobby after room creation
       const sessionName = window.sessionStorage.getItem(
-        "skriblix-current-room-player-name"
+        "skriblix-current-room-player-name",
       );
       if (sessionName) {
         playerName = sessionName;
@@ -140,7 +140,6 @@ export default function RoomGamePage() {
 
     socket.on("game_started", (data: any) => {
       setRoom(data.room);
-      setRoundCountdown(60);
     });
 
     socket.on("new_round", (data: any) => {
@@ -153,7 +152,6 @@ export default function RoomGamePage() {
           gameState: "drawing",
         };
       });
-      setRoundCountdown(60);
       clearCanvasRef.current?.(false);
     });
 
@@ -340,23 +338,26 @@ export default function RoomGamePage() {
       canvas.removeEventListener("touchmove", handleTouchMove);
       canvas.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [isDrawer, isSpectator, room?.gameState, roomId]);
+  }, [drawSegment, isDrawer, isSpectator, room?.gameState, roomId]);
+
+  const roundCountdown = useMemo(() => {
+    if (!room?.countdownEndsAt || room.gameState !== "drawing") {
+      return null;
+    }
+
+    const remainingMs = Math.max(0, room.countdownEndsAt - now);
+    return Math.ceil(remainingMs / 1000);
+  }, [room?.countdownEndsAt, room?.gameState, now]);
 
   useEffect(() => {
-    if (room?.gameState !== "drawing" || !isDrawer) return;
+    if (!room?.countdownEndsAt || room.gameState !== "drawing") return;
 
     const timer = setInterval(() => {
-      setRoundCountdown((prev) => {
-        if (prev <= 1) {
-          nextWordRef.current?.();
-          return 60;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      setNow(Date.now());
+    }, 250);
 
     return () => clearInterval(timer);
-  }, [isDrawer, room?.gameState]);
+  }, [room?.countdownEndsAt, room?.gameState]);
 
   const sendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -390,12 +391,17 @@ export default function RoomGamePage() {
         />
       )}
       <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-10">
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-4xl font-black tracking-tight">Skriblix</h1>
-            <p className="mt-1 text-sm uppercase tracking-[0.16em] text-zinc-700">
-              Room: {roomId}
-            </p>
+        <div className="flex justify-between">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-4xl font-black tracking-tight">Skriblix</h1>
+              <p className="mt-1 text-sm uppercase tracking-[0.16em] text-zinc-700">
+                Room: {roomId}
+              </p>
+            </div>
+          </div>
+          <div className="doodle-card mb-10 p-1">
+            <p>ROUND: 1</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -427,7 +433,7 @@ export default function RoomGamePage() {
                 </div>
               </div>
 
-              {isDrawer && (
+              {room.gameState === "drawing" && roundCountdown !== null && (
                 <div className="mb-4">
                   <div className="flex items-center gap-3">
                     <p className="text-sm uppercase tracking-[0.14em] text-zinc-600 font-semibold">
@@ -436,7 +442,9 @@ export default function RoomGamePage() {
                     <div className="h-3 flex-1 overflow-hidden rounded-full border-2 border-zinc-950 bg-white">
                       <div
                         className="h-full bg-zinc-950 transition-all duration-1000"
-                        style={{ width: `${(roundCountdown / 60) * 100}%` }}
+                        style={{
+                          width: `${(Math.max(0, roundCountdown) / 60) * 100}%`,
+                        }}
                       />
                     </div>
                     <p className="w-12 text-xl font-black text-zinc-950">
@@ -493,7 +501,7 @@ export default function RoomGamePage() {
                     key={roomPlayer.id}
                     className={`flex items-center gap-3 rounded-xl border-2 p-3 ${
                       roomPlayer.id === room.drawer
-                        ? "border-zinc-950 bg-zinc-950 text-white shadow-[4px_4px_0_#111]"
+                        ? "border-zinc-950 bg-zinc-950 text-white"
                         : "border-zinc-950 bg-white"
                     }`}
                   >
