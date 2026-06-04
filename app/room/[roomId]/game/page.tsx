@@ -9,6 +9,21 @@ import { DoodleErrorPopup } from "@/app/components/doodle-error-popup";
 
 const PLAYER_KEY_STORAGE_KEY = "skriblix-player-key";
 
+// Normalize a string for comparison: remove spaces, punctuation, convert to lowercase
+function normalizeGuess(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, "") // Remove all spaces
+    .replace(/[^\w]/g, ""); // Remove non-word characters (punctuation, etc.)
+}
+
+// Check if guess matches the answer word
+function isCorrectGuess(guess: string, answer: string): boolean {
+  const normalizedGuess = normalizeGuess(guess);
+  const normalizedAnswer = normalizeGuess(answer);
+  return normalizedGuess === normalizedAnswer;
+}
+
 interface Player {
   id: string;
   name: string;
@@ -62,6 +77,10 @@ export default function RoomGamePage() {
   const [isOpen, setIsOpen] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [message, setMessage] = useState("");
+  const [guess, setGuess] = useState("");
+  const [guessResult, setGuessResult] = useState<
+    "correct" | "incorrect" | null
+  >(null);
   const [now, setNow] = useState(() => Date.now());
   const [playerId, setPlayerId] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -365,6 +384,27 @@ export default function RoomGamePage() {
     setMessage("");
   };
 
+  const submitGuess = () => {
+    if (!guess.trim() || !playerId || !room?.currentWord || isDrawer) return;
+
+    const isCorrect = isCorrectGuess(guess, room.currentWord);
+
+    socketRef.current?.emit("chat_message", {
+      roomId,
+      message: guess.trim(),
+      playerId,
+    });
+
+    setGuessResult(isCorrect ? "correct" : "incorrect");
+    setGuess("");
+
+    // Auto-close modal after feedback
+    setTimeout(() => {
+      setIsOpen(false);
+      setGuessResult(null);
+    }, 1500);
+  };
+
   if (!room) {
     return (
       <DoodleLoadingScreen
@@ -581,15 +621,17 @@ export default function RoomGamePage() {
                 </form>
               ) : null}
             </div>
-            <div>
-              <button
-                type="button"
-                className="flex justify-center items-center text-xl font-bold doodle-button doodle-button-secondary w-30 mx-auto h-12 mt-6 cursor-pointer"
-                onClick={() => setIsOpen(true)}
-              >
-                GUESS
-              </button>
-            </div>
+            {!isSpectator && !isDrawer ? (
+              <div>
+                <button
+                  type="button"
+                  className="flex justify-center items-center text-xl font-bold doodle-button doodle-button-secondary w-30 mx-auto h-12 mt-6 cursor-pointer"
+                  onClick={() => setIsOpen(true)}
+                >
+                  GUESS
+                </button>
+              </div>
+            ) : null}
             {isOpen && (
               <div
                 className="fixed inset-0 flex items-center justify-center bg-black/40"
@@ -611,16 +653,41 @@ export default function RoomGamePage() {
                     YOUR GUESS
                   </h2>
 
-                  <div>
-                    <input
-                      className="border-2 p-2 rounded-xl w-65 placeholder:text-[15px] text-[15px]"
-                      placeholder="Your guess..."
-                    />
-                  </div>
+                  {guessResult ? (
+                    <div
+                      className={`text-center text-3xl font-black mb-4 ${
+                        guessResult === "correct"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {guessResult === "correct"
+                        ? "You guessed correct! ✅"
+                        : "Not quite! Try again!"}
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <input
+                          className="border-2 p-2 rounded-xl w-65 placeholder:text-[15px] text-[15px]"
+                          placeholder="Your guess..."
+                          value={guess}
+                          onChange={(e) => setGuess(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter") submitGuess();
+                          }}
+                          autoFocus
+                        />
+                      </div>
 
-                  <button className="mt-5 px-4 py-2 rounded doodle-button doodle-button-secondary flex items-center justify-center text-center w-full cursor-pointer">
-                    Submit
-                  </button>
+                      <button
+                        onClick={submitGuess}
+                        className="mt-5 px-4 py-2 rounded doodle-button doodle-button-secondary flex items-center justify-center text-center w-full cursor-pointer"
+                      >
+                        Submit
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}

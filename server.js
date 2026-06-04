@@ -19,6 +19,21 @@ function registerSocketHandlers(io) {
   const PRE_GAME_LOADING_MS = 1500;
   const DRAWING_ROUND_MS = 60 * 1000;
 
+  // Normalize a string for comparison: remove spaces, punctuation, convert to lowercase
+  function normalizeGuess(text) {
+    return text
+      .toLowerCase()
+      .replace(/\s+/g, "") // Remove all spaces
+      .replace(/[^\w]/g, ""); // Remove non-word characters (punctuation, etc.)
+  }
+
+  // Check if guess matches the answer word
+  function isCorrectGuess(guess, answer) {
+    const normalizedGuess = normalizeGuess(guess);
+    const normalizedAnswer = normalizeGuess(answer);
+    return normalizedGuess === normalizedAnswer;
+  }
+
   function clearRoomCleanup(roomId) {
     const timer = roomCleanupTimers.get(roomId);
     if (timer) {
@@ -465,23 +480,22 @@ function registerSocketHandlers(io) {
       };
       room.messages.push(chatMsg);
 
-      const isCorrectGuess =
+      const isCorrectGuessResult =
         room.gameState === "drawing" &&
         room.currentWord &&
-        message.toLowerCase() === room.currentWord.toLowerCase();
+        isCorrectGuess(message, room.currentWord);
 
-      if (isCorrectGuess) {
+      if (isCorrectGuessResult) {
         chatMsg.isCorrect = true;
-        room.gameState = "waiting";
-        room.drawings = [];
-        room.countdownEndsAt = null;
-        room.loadingEndsAt = null;
+        const correctWord = room.currentWord;
         clearGameTimers(roomId);
+
         io.to(roomId).emit("correct_guess", {
-          playerId,
-          word: room.currentWord,
+          playerId: socket.id,
+          word: correctWord,
         });
-        io.to(roomId).emit("game_state_update", { room });
+
+        startDrawingRound(roomId);
       }
 
       io.to(roomId).emit("new_message", { message: chatMsg });
