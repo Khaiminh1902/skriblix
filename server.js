@@ -347,6 +347,16 @@ function registerSocketHandlers(io) {
         if (room.drawer === previousPlayerId) {
           room.drawer = socket.id;
         }
+        room.messages.forEach((chatMsg) => {
+          if (chatMsg.playerId === previousPlayerId) {
+            chatMsg.playerId = socket.id;
+          }
+        });
+        room.drawings.forEach((drawing) => {
+          if (drawing.playerId === previousPlayerId) {
+            drawing.playerId = socket.id;
+          }
+        });
       } else {
         const player = {
           id: socket.id,
@@ -442,13 +452,13 @@ function registerSocketHandlers(io) {
       io.to(roomId).emit("canvas_cleared");
     });
 
-    socket.on("chat_message", ({ roomId, message, playerId }) => {
+    socket.on("chat_message", ({ roomId, message }) => {
       const room = rooms.get(roomId);
 
       if (!room) return;
 
       const chatMsg = {
-        playerId,
+        playerId: socket.id,
         message,
         timestamp: Date.now(),
         isCorrect: false,
