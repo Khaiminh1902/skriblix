@@ -65,11 +65,10 @@ export default function HomeClient({
     socketRef.current = s;
 
     s.on("room_created", (data: any) => {
-      // Store the player name for the room page to use
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(
           "skriblix-current-room-player-name",
-          createPlayerNameRef.current
+          createPlayerNameRef.current,
         );
       }
       const elapsed = Date.now() - pendingActionStartedAtRef.current;

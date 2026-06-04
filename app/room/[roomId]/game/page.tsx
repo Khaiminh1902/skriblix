@@ -96,16 +96,13 @@ export default function RoomGamePage() {
   useEffect(() => {
     let playerName = "";
     if (typeof window !== "undefined") {
-      // First check for session storage value set by lobby after room creation
       const sessionName = window.sessionStorage.getItem(
         "skriblix-current-room-player-name",
       );
       if (sessionName) {
         playerName = sessionName;
-        // Clear it so it's only used once
         window.sessionStorage.removeItem("skriblix-current-room-player-name");
       } else {
-        // Fall back to original logic
         playerName =
           localStorage.getItem("skriblix-join-name") ||
           localStorage.getItem("skriblix-create-name") ||
@@ -400,8 +397,8 @@ export default function RoomGamePage() {
               </p>
             </div>
           </div>
-          <div className="doodle-card mb-10 p-2 flex items-center justify-center w-28 h-13 font-extrabold">
-            <p>ROUND: 10</p>
+          <div className="doodle-card mb-10 p-2 flex items-center justify-center w-27 h-13 font-bold">
+            <p>ROUND: 1</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
