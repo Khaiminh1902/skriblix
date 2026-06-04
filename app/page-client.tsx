@@ -69,7 +69,7 @@ export default function HomeClient({
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(
           "skriblix-current-room-player-name",
-          createPlayerNameRef.current,
+          createPlayerNameRef.current
         );
       }
       const elapsed = Date.now() - pendingActionStartedAtRef.current;
@@ -182,8 +182,8 @@ export default function HomeClient({
         }
         subtitle={
           pendingAction === "create"
-            ? "Setting up a fresh room and pinning the room code to the corkboard"
-            : "Checking the room code and pulling your seat into the waiting room"
+            ? "Setting up a fresh room and pinning the room code to the corkboard."
+            : "Checking the room code and pulling your seat into the waiting room."
         }
         roomId={pendingAction === "create" ? draftRoomId : joinRoomId}
       />
