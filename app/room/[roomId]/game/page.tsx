@@ -400,7 +400,7 @@ export default function RoomGamePage() {
               </p>
             </div>
           </div>
-          <div className="doodle-card mb-10 p-1">
+          <div className="doodle-card mb-10 p-2 flex items-center justify-center w-27 h-13 font-semibold">
             <p>ROUND: 1</p>
           </div>
         </div>
