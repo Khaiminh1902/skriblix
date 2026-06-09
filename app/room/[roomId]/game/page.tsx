@@ -151,6 +151,9 @@ export default function RoomGamePage() {
     });
 
     socket.on("new_round", (data: any) => {
+      setIsOpen(false);
+      setGuess("");
+      setGuessResult(null);
       setRoom((prev) => {
         if (!prev) return prev;
         return {
@@ -663,7 +666,7 @@ export default function RoomGamePage() {
                     <>
                       <div>
                         <input
-                          className="border-2 p-2 rounded-xl w-65 placeholder:text-[15px] text-[15px]"
+                          className="outline-none border-2 p-2 rounded-xl w-65 placeholder:text-[15px] text-[15px]"
                           placeholder="Your guess..."
                           value={guess}
                           onChange={(e) => setGuess(e.target.value)}

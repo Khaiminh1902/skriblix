@@ -5,7 +5,7 @@ export default function Loading() {
     <DoodleLoadingScreen
       badge="Joining"
       title="Sharpening pencils"
-      subtitle="Building your room and syncing the sketchbook."
+      subtitle="Building your room and syncing the sketchbook"
     />
   );
 }
