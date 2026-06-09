@@ -18,6 +18,7 @@ function registerSocketHandlers(io) {
   const PRE_GAME_COUNTDOWN_MS = 5 * 1000;
   const PRE_GAME_LOADING_MS = 1500;
   const DRAWING_ROUND_MS = 60 * 1000;
+  const MAX_ROUNDS = 10;
 
   function normalizeGuess(text) {
     return text.toLowerCase().replace(/\s+/g, "").replace(/[^\w]/g, "");
@@ -160,9 +161,28 @@ function registerSocketHandlers(io) {
     );
   }
 
+  function finishGame(roomId) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    clearGameTimers(roomId);
+    room.gameState = "finished";
+    room.resultPlayers = room.players.map((player) => ({ ...player }));
+    room.countdownEndsAt = null;
+    room.loadingEndsAt = null;
+    room.drawer = null;
+    room.currentWord = null;
+
+    io.to(roomId).emit("game_finished", { room });
+    emitRoomState(roomId);
+  }
+
   function startDrawingRound(roomId) {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
+
+    room.currentRound = (room.currentRound ?? 0) + 1;
+    const isFinalRound = room.currentRound >= MAX_ROUNDS;
 
     room.drawer = getRandomDrawerId(room.players, room.drawer);
     room.currentWord = getRandomWord();
@@ -176,6 +196,12 @@ function registerSocketHandlers(io) {
     const drawingTimer = setTimeout(() => {
       const activeRoom = rooms.get(roomId);
       if (!activeRoom || activeRoom.gameState !== "drawing") return;
+
+      if (isFinalRound) {
+        finishGame(roomId);
+        return;
+      }
+
       startDrawingRound(roomId);
     }, DRAWING_ROUND_MS);
 
@@ -185,6 +211,8 @@ function registerSocketHandlers(io) {
     io.to(roomId).emit("new_round", {
       drawerId: room.drawer,
       word: room.currentWord,
+      currentRound: room.currentRound,
+      totalRounds: room.totalRounds,
     });
     emitRoomState(roomId);
   }
@@ -310,6 +338,9 @@ function registerSocketHandlers(io) {
           drawings: [],
           messages: [],
           gameState: "waiting",
+          resultPlayers: [],
+          currentRound: 0,
+          totalRounds: MAX_ROUNDS,
           countdownEndsAt: null,
           loadingEndsAt: null,
           createdAt: Date.now(),
@@ -342,7 +373,11 @@ function registerSocketHandlers(io) {
         (player) => player.playerKey === playerKey,
       );
 
-      if (!existingPlayer && room.gameState !== "waiting") {
+      if (
+        !existingPlayer &&
+        room.gameState !== "waiting" &&
+        room.gameState !== "finished"
+      ) {
         socket.emit("error", { message: "Game already in progress" });
         return;
       }
@@ -437,6 +472,9 @@ function registerSocketHandlers(io) {
       room.players.forEach((player) => {
         player.status = "ready";
       });
+      room.resultPlayers = [];
+      room.currentRound = 0;
+      room.totalRounds = MAX_ROUNDS;
       emitRoomState(roomId);
       startPreGameCountdown(roomId);
     });
@@ -490,7 +528,11 @@ function registerSocketHandlers(io) {
           word: correctWord,
         });
 
-        startDrawingRound(roomId);
+        if (room.currentRound >= room.totalRounds) {
+          finishGame(roomId);
+        } else {
+          startDrawingRound(roomId);
+        }
       }
 
       io.to(roomId).emit("new_message", { message: chatMsg });

@@ -48,7 +48,9 @@ interface Room {
   currentWord: string | null;
   drawings: DrawingSegment[];
   messages: RoomMessage[];
-  gameState: "waiting" | "countdown" | "starting" | "drawing";
+  gameState: "waiting" | "countdown" | "starting" | "drawing" | "finished";
+  currentRound?: number;
+  totalRounds?: number;
   countdownEndsAt?: number | null;
   loadingEndsAt?: number | null;
 }
@@ -193,6 +195,10 @@ export default function RoomGamePage() {
       clearCanvasRef.current?.(false);
     });
 
+    socket.on("game_finished", () => {
+      router.replace(`/room/${roomId}/game/result`);
+    });
+
     socket.on("error", (data: any) => {
       setErrorMessage(data.message || "Unable to join room");
       router.push("/");
@@ -204,6 +210,12 @@ export default function RoomGamePage() {
       socketRef.current = null;
     };
   }, [drawSegment, roomId, router]);
+
+  useEffect(() => {
+    if (room?.gameState === "finished") {
+      router.replace(`/room/${roomId}/game/result`);
+    }
+  }, [room?.gameState, roomId, router]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -431,8 +443,10 @@ export default function RoomGamePage() {
               </p>
             </div>
           </div>
-          <div className="doodle-card mb-10 p-2 flex items-center justify-center w-27 h-13 font-bold">
-            <p>ROUND: 1</p>
+          <div className="doodle-card mb-10 p-2 flex items-center justify-center min-w-32 h-13 font-bold text-center">
+            <p>
+              ROUND: {room.currentRound ?? 1}/{room.totalRounds ?? 10}
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
