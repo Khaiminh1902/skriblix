@@ -189,8 +189,8 @@ export default function HomeClient({
         }
         subtitle={
           pendingAction === "create"
-            ? "Setting up a fresh room and pinning the room code to the corkboard."
-            : "Checking the room code and pulling your seat into the waiting room."
+            ? "Setting up a fresh room and pinning the room code to the corkboard"
+            : "Checking the room code and pulling your seat into the waiting room"
         }
         roomId={pendingAction === "create" ? draftRoomId : joinRoomId}
       />

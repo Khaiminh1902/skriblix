@@ -231,7 +231,7 @@ export default function RoomPage() {
             <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-700 md:text-base">
               {room.gameState === "countdown"
                 ? "The round is about to start. Hold tight while everyone enters together."
-                : "You need at least two players before the game can start. Share the room code and wait for the crew to assemble"}
+                : "You need at least two players before the game can start. Share the room code and play the waiting game until others join"}
             </p>
 
             <div className="mt-8 rounded-4xl border-2 border-zinc-950 bg-white px-6 py-8 text-center shadow-[6px_6px_0_#111]">
@@ -279,7 +279,7 @@ export default function RoomPage() {
               </button>
               <p className="text-sm text-zinc-700">
                 {room.players.length < 2
-                  ? "Waiting for one more player to join"
+                  ? "Waiting for more players to join"
                   : room.gameState === "countdown"
                     ? "Everyone is ready. The game will open for all players"
                     : isReady

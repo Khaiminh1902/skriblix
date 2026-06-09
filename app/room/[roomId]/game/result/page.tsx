@@ -97,11 +97,11 @@ export default function ResultPage() {
             Match complete
           </p>
           <h1 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">
-            That’s the end of the 10 rounds.
+            Game Finished!
           </h1>
           <p className="mt-4 text-zinc-700">
-            The room has finished. Review the players below, then head back
-            home.
+            The game has finished. See the winner, admire, then head back home,
+            idiot
           </p>
 
           <div className="mt-8 rounded-3xl border-2 border-zinc-950 bg-white p-5 text-left shadow-[5px_5px_0_#111]">
