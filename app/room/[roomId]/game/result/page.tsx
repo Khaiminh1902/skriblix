@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { FaCrown } from "react-icons/fa";
 import io from "socket.io-client";
 
 const PLAYER_KEY_STORAGE_KEY = "skriblix-player-key";
@@ -10,6 +11,7 @@ interface Player {
   id: string;
   name: string;
   status: string;
+  score?: number;
 }
 
 interface Room {
@@ -88,6 +90,13 @@ export default function ResultPage() {
   };
 
   const playersToShow = room?.resultPlayers ?? room?.players ?? [];
+  const highestScore = playersToShow.reduce(
+    (max, player) => Math.max(max, player.score ?? 0),
+    0,
+  );
+  const winners = playersToShow.filter(
+    (player) => (player.score ?? 0) === highestScore,
+  );
 
   return (
     <main className="doodle-shell min-h-screen text-zinc-950">
@@ -114,17 +123,35 @@ export default function ResultPage() {
           <div className="mt-8 rounded-3xl border-2 border-zinc-950 bg-white p-5 text-left shadow-[5px_5px_0_#111]">
             <h2 className="text-lg font-black">Players</h2>
             <div className="mt-4 space-y-2">
-              {playersToShow.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between rounded-2xl border border-zinc-950/10 bg-zinc-50 px-4 py-3"
-                >
-                  <span className="font-semibold">{player.name}</span>
-                  <span className="text-xs uppercase tracking-[0.18em] text-zinc-600">
-                    {player.id === room?.hostId ? "Host" : "Player"}
-                  </span>
-                </div>
-              ))}
+              {playersToShow.map((player) => {
+                const isWinner = winners.some(
+                  (winner) => winner.id === player.id,
+                );
+
+                return (
+                  <div
+                    key={player.id}
+                    className={`flex items-center justify-between rounded-2xl border border-zinc-950/10 px-4 py-3 ${
+                      isWinner
+                        ? "bg-amber-100 shadow-[inset_0_0_0_1px_rgba(17,24,39,0.08)]"
+                        : "bg-zinc-50"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-semibold">
+                      {player.name}
+                      {isWinner ? (
+                        <FaCrown className="text-amber-500" title="Winner" />
+                      ) : null}
+                    </span>
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-zinc-600">
+                      <span>Score {player.score ?? 0}</span>
+                      <span className="rounded-full border border-zinc-950/10 bg-white px-2 py-1">
+                        {player.id === room?.hostId ? "Host" : "Player"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

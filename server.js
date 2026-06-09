@@ -331,6 +331,7 @@ function registerSocketHandlers(io) {
               playerKey,
               name: playerName,
               status: "not_ready",
+              score: 0,
             },
           ],
           drawer: null,
@@ -408,6 +409,7 @@ function registerSocketHandlers(io) {
           playerKey,
           name: playerName,
           status: "not_ready",
+          score: 0,
         };
         room.players.push(player);
         io.to(roomId).emit("player_joined", { player });
@@ -521,6 +523,14 @@ function registerSocketHandlers(io) {
       if (isCorrectGuessResult) {
         chatMsg.isCorrect = true;
         const correctWord = room.currentWord;
+        const guessingPlayer = room.players.find(
+          (player) => player.id === socket.id,
+        );
+
+        if (guessingPlayer) {
+          guessingPlayer.score = (guessingPlayer.score || 0) + 1;
+        }
+
         clearGameTimers(roomId);
 
         io.to(roomId).emit("correct_guess", {

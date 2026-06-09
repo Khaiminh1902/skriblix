@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { FaTrophy } from "react-icons/fa";
 import { DoodleLoadingScreen } from "@/app/components/doodle-loading-screen";
 import { DoodleErrorPopup } from "@/app/components/doodle-error-popup";
 
@@ -23,6 +24,7 @@ interface Player {
   id: string;
   name: string;
   status: string;
+  score?: number;
 }
 
 interface RoomMessage {
@@ -558,16 +560,22 @@ export default function RoomGamePage() {
                       }`}
                     />
                     <span className="font-semibold">{roomPlayer.name}</span>
-                    {roomPlayer.id === room.hostId ? (
-                      <span className="ml-auto rounded-full border border-current px-2 py-0.5 text-xs font-bold uppercase tracking-[0.12em]">
-                        Host
+                    <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                      {roomPlayer.id === room.hostId ? (
+                        <span className="rounded-full border border-current px-2 py-0.5 text-xs font-bold uppercase tracking-[0.12em]">
+                          Host
+                        </span>
+                      ) : null}
+                      {roomPlayer.id === room.drawer ? (
+                        <span className="rounded-full border border-white px-2 py-0.5 text-xs font-bold uppercase tracking-[0.12em]">
+                          Drawer
+                        </span>
+                      ) : null}
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-100 px-2 py-0.5 text-xs font-black uppercase tracking-[0.12em] text-amber-700 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.2)]">
+                        <FaTrophy className="text-amber-500" />
+                        {roomPlayer.score ?? 0}
                       </span>
-                    ) : null}
-                    {roomPlayer.id === room.drawer ? (
-                      <span className="ml-auto rounded-full border border-white px-2 py-0.5 text-xs font-bold uppercase tracking-[0.12em]">
-                        Drawer
-                      </span>
-                    ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
