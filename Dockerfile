@@ -19,7 +19,6 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=base /app/.next ./.next
-COPY --from=base /app/public ./public
 COPY --from=base /app/server.js ./server.js
 COPY --from=base /app/next.config.ts ./next.config.ts
 COPY --from=base /app/next-env.d.ts ./next-env.d.ts
