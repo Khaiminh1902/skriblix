@@ -68,6 +68,14 @@ function registerSocketHandlers(io) {
       clearTimeout(timers.drawingTimer);
     }
 
+    if (timers.countdownTicker) {
+      clearInterval(timers.countdownTicker);
+    }
+
+    if (timers.drawingTicker) {
+      clearInterval(timers.drawingTicker);
+    }
+
     gamePhaseTimers.delete(roomId);
   }
 
@@ -154,6 +162,18 @@ function registerSocketHandlers(io) {
     io.to("lobby").emit("room_list", getRoomList());
   }
 
+  function broadcastCountdownTick(roomId, countdownRemaining, gameState) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    room.countdownRemaining = countdownRemaining;
+    io.to(roomId).emit("countdown_tick", {
+      roomId,
+      countdownRemaining,
+      gameState,
+    });
+  }
+
   function areAllPlayersReady(room) {
     return (
       room.players.length >= 2 &&
@@ -172,6 +192,7 @@ function registerSocketHandlers(io) {
     room.loadingEndsAt = null;
     room.drawer = null;
     room.currentWord = null;
+    room.countdownRemaining = null;
 
     io.to(roomId).emit("game_finished", { room });
     emitRoomState(roomId);
@@ -190,6 +211,7 @@ function registerSocketHandlers(io) {
     room.gameState = "drawing";
     room.countdownEndsAt = Date.now() + DRAWING_ROUND_MS;
     room.loadingEndsAt = null;
+    room.countdownRemaining = Math.ceil(DRAWING_ROUND_MS / 1000);
 
     clearGameTimers(roomId);
 
@@ -205,7 +227,19 @@ function registerSocketHandlers(io) {
       startDrawingRound(roomId);
     }, DRAWING_ROUND_MS);
 
-    gamePhaseTimers.set(roomId, { drawingTimer });
+    const drawingTicker = setInterval(() => {
+      const activeRoom = rooms.get(roomId);
+      if (!activeRoom || activeRoom.gameState !== "drawing") return;
+
+      const remainingMs = Math.max(0, activeRoom.countdownEndsAt - Date.now());
+      const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+
+      if (activeRoom.countdownRemaining !== remainingSeconds) {
+        broadcastCountdownTick(roomId, remainingSeconds, activeRoom.gameState);
+      }
+    }, 1000);
+
+    gamePhaseTimers.set(roomId, { drawingTimer, drawingTicker });
 
     io.to(roomId).emit("game_started", { room });
     io.to(roomId).emit("new_round", {
@@ -231,6 +265,7 @@ function registerSocketHandlers(io) {
       room.currentWord = null;
       room.countdownEndsAt = null;
       room.loadingEndsAt = null;
+      room.countdownRemaining = null;
       emitRoomState(roomId);
     }
   }
@@ -248,7 +283,9 @@ function registerSocketHandlers(io) {
     room.drawings = [];
     room.countdownEndsAt = Date.now() + PRE_GAME_COUNTDOWN_MS;
     room.loadingEndsAt = null;
+    room.countdownRemaining = Math.ceil(PRE_GAME_COUNTDOWN_MS / 1000);
     emitRoomState(roomId);
+    broadcastCountdownTick(roomId, room.countdownRemaining, room.gameState);
 
     const countdownTimer = setTimeout(() => {
       const activeRoom = rooms.get(roomId);
@@ -258,9 +295,11 @@ function registerSocketHandlers(io) {
         return;
       }
 
+      clearGameTimers(roomId);
       activeRoom.gameState = "starting";
       activeRoom.countdownEndsAt = null;
       activeRoom.loadingEndsAt = Date.now() + PRE_GAME_LOADING_MS;
+      activeRoom.countdownRemaining = null;
       emitRoomState(roomId);
 
       const loadingTimer = setTimeout(() => {
@@ -277,7 +316,19 @@ function registerSocketHandlers(io) {
       gamePhaseTimers.set(roomId, { loadingTimer });
     }, PRE_GAME_COUNTDOWN_MS);
 
-    gamePhaseTimers.set(roomId, { countdownTimer });
+    const countdownTicker = setInterval(() => {
+      const activeRoom = rooms.get(roomId);
+      if (!activeRoom || activeRoom.gameState !== "countdown") return;
+
+      const remainingMs = Math.max(0, activeRoom.countdownEndsAt - Date.now());
+      const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+
+      if (activeRoom.countdownRemaining !== remainingSeconds) {
+        broadcastCountdownTick(roomId, remainingSeconds, activeRoom.gameState);
+      }
+    }, 1000);
+
+    gamePhaseTimers.set(roomId, { countdownTimer, countdownTicker });
   }
 
   io.on("connection", (socket) => {
@@ -339,6 +390,7 @@ function registerSocketHandlers(io) {
           drawings: [],
           messages: [],
           gameState: "waiting",
+          countdownRemaining: null,
           resultPlayers: [],
           currentRound: 0,
           totalRounds: MAX_ROUNDS,

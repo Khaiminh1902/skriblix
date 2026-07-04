@@ -27,6 +27,7 @@ interface Room {
   gameState: "waiting" | "countdown" | "starting" | "drawing";
   countdownEndsAt?: number | null;
   loadingEndsAt?: number | null;
+  countdownRemaining?: number | null;
 }
 
 function getPlayerKey() {
@@ -48,7 +49,7 @@ export default function RoomPage() {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [playerId, setPlayerId] = useState("");
-  const [countdownRemaining, setCountdownRemaining] = useState(5);
+  const [now, setNow] = useState(() => Date.now());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState("Copy");
 
@@ -104,6 +105,17 @@ export default function RoomPage() {
       setRoom(data.room);
     });
 
+    socket.on("countdown_tick", (data: any) => {
+      setRoom((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          gameState: data.gameState || prev.gameState,
+          countdownRemaining: data.countdownRemaining,
+        };
+      });
+    });
+
     socket.on("error", (data: any) => {
       setErrorMessage(data.message || "Unable to join room");
       router.push("/");
@@ -126,19 +138,25 @@ export default function RoomPage() {
   }, [room, roomId, router]);
 
   useEffect(() => {
-    if (room?.gameState !== "countdown" || !room.countdownEndsAt) {
+    if (room?.gameState !== "countdown") {
       return;
     }
 
-    const updateCountdown = () => {
-      const remainingMs = Math.max(0, room.countdownEndsAt! - Date.now());
-      setCountdownRemaining(Math.ceil(remainingMs / 1000));
-    };
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 250);
 
-    updateCountdown();
-    const timer = setInterval(updateCountdown, 250);
-    return () => clearInterval(timer);
-  }, [room?.countdownEndsAt, room?.gameState]);
+    return () => window.clearInterval(interval);
+  }, [room?.gameState]);
+
+  const countdownRemaining =
+    room?.gameState === "countdown"
+      ? typeof room.countdownRemaining === "number"
+        ? room.countdownRemaining
+        : room.countdownEndsAt
+          ? Math.max(0, Math.ceil((room.countdownEndsAt - now) / 1000))
+          : 5
+      : 5;
 
   const players = room?.players ?? [];
   const currentPlayer = players.find((p) => p.id === playerId);

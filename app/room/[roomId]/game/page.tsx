@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FaTrophy } from "react-icons/fa";
 import { DoodleLoadingScreen } from "@/app/components/doodle-loading-screen";
@@ -55,6 +55,7 @@ interface Room {
   totalRounds?: number;
   countdownEndsAt?: number | null;
   loadingEndsAt?: number | null;
+  countdownRemaining?: number | null;
 }
 
 function getPlayerKey() {
@@ -193,6 +194,18 @@ export default function RoomGamePage() {
       setRoom(data.room);
     });
 
+    socket.on("countdown_tick", (data: any) => {
+      if (data.gameState === "drawing") {
+        setRoom((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            countdownRemaining: data.countdownRemaining ?? null,
+          };
+        });
+      }
+    });
+
     socket.on("correct_guess", () => {
       clearCanvasRef.current?.(false);
     });
@@ -218,6 +231,27 @@ export default function RoomGamePage() {
       router.replace(`/room/${roomId}/game/result`);
     }
   }, [room?.gameState, roomId, router]);
+
+  useEffect(() => {
+    if (room?.gameState !== "drawing") {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [room?.gameState]);
+
+  const roundCountdown =
+    room?.gameState === "drawing"
+      ? typeof room.countdownRemaining === "number"
+        ? room.countdownRemaining
+        : room.countdownEndsAt
+          ? Math.max(0, Math.ceil((room.countdownEndsAt - now) / 1000))
+          : null
+      : null;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -364,25 +398,6 @@ export default function RoomGamePage() {
       canvas.removeEventListener("touchend", handleTouchEnd);
     };
   }, [drawSegment, isDrawer, isSpectator, room?.gameState, roomId]);
-
-  const roundCountdown = useMemo(() => {
-    if (!room?.countdownEndsAt || room.gameState !== "drawing") {
-      return null;
-    }
-
-    const remainingMs = Math.max(0, room.countdownEndsAt - now);
-    return Math.ceil(remainingMs / 1000);
-  }, [room?.countdownEndsAt, room?.gameState, now]);
-
-  useEffect(() => {
-    if (!room?.countdownEndsAt || room.gameState !== "drawing") return;
-
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 250);
-
-    return () => clearInterval(timer);
-  }, [room?.countdownEndsAt, room?.gameState]);
 
   const sendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
