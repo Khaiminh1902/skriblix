@@ -31,11 +31,43 @@ A multiplayer drawing and guessing game inspired by Skribbl.io, with a doodle-th
 
 ---
 
+## Setup
+
+### Prerequisites
+
+- Node.js 20 or newer
+- npm
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+### Run locally
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The app will be available at http://localhost:3000
+
+### Build for production
+
+```bash
+npm run build
+npm start
+```
+
+---
+
 ## Tech Stack
 
-- Nextjs
+- Next.js
 - Socket.io
-- Typescript
+- TypeScript
 - Tailwind CSS
 
 ---
